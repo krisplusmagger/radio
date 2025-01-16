@@ -2,3 +2,9 @@
 *.pyc
 *.pyo
 build*/
+
+# Ignore specific OFDM example files
+gr-digital/examples/ofdm/channel_tpas*.txt
+gr-digital/examples/ofdm/eavesdropper_detection.grc
+gr-digital/examples/ofdm/freq_offsets_testing.txt
+gr-digital/examples/ofdm/offsets_*.txt
