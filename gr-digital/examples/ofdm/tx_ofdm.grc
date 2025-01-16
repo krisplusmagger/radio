@@ -9,7 +9,7 @@ options:
     description: Example of an OFDM Transmitter
     gen_cmake: 'On'
     gen_linking: dynamic
-    generate_options: qt_gui
+    generate_options: no_gui
     hier_block_src_path: '.:'
     id: tx_ofdm
     max_nouts: '0'
@@ -19,7 +19,7 @@ options:
     realtime_scheduling: ''
     run: 'True'
     run_command: '{python} -u {filename}'
-    run_options: run
+    run_options: prompt
     sizing_mode: fixed
     thread_safe_setters: ''
     title: OFDM Tx
@@ -284,7 +284,7 @@ blocks:
     comment: ''
     display: 'True'
     filter: '""'
-    name: Rx'd Packets
+    name: Rx'ddd Packets
     num_inputs: '1'
     type: byte
     vlen: '1'
@@ -292,7 +292,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [786, 832]
+    coordinate: [776, 824.0]
     rotation: 0
     state: enabled
 - name: blocks_tag_gate_0
@@ -631,9 +631,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1034, 760]
+    coordinate: [1064, 792.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: qtgui_time_sink_x_0
   id: qtgui_time_sink_x
   parameters:
@@ -730,7 +730,7 @@ blocks:
     bus_structure: null
     coordinate: [1034, 672]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: virtual_sink_0
   id: virtual_sink
   parameters:
@@ -780,7 +780,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1034, 624]
+    coordinate: [1064, 600.0]
     rotation: 0
     state: enabled
 - name: virtual_source_0
@@ -793,7 +793,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [82, 320]
+    coordinate: [16, 320.0]
     rotation: 0
     state: enabled
 - name: virtual_source_0_0
@@ -806,7 +806,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [82, 392]
+    coordinate: [16, 408.0]
     rotation: 0
     state: enabled
 - name: virtual_source_0_0_0
@@ -877,4 +877,4 @@ connections:
 
 metadata:
   file_format: 1
-  grc_version: 3.10.10.0
+  grc_version: v3.11.0.0git-843-g6b25c171
