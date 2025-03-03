@@ -26,7 +26,15 @@ include(GrPybind)
 
 list(APPEND customModule_python_files
     getTaps_python.cc
-    getCFO_python.cc python_bindings.cc)
+    getCFO_python.cc
+    getSyncsymbol_python.cc
+    getSignal_python.cc
+    getEqsignal_python.cc
+    getPayload_python.cc
+    getEqlizedsig_python.cc
+    recordBaseband_python.cc
+    getBaseband_python.cc
+    Serlizsig_python.cc python_bindings.cc)
 
 gr_pybind_make_oot(customModule ../../.. gr::customModule "${customModule_python_files}")
 

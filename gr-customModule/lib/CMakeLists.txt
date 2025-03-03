@@ -13,7 +13,15 @@ include(GrPlatform) #define LIB_SUFFIX
 
 list(APPEND customModule_sources
     getTaps_impl.cc
-    getCFO_impl.cc)
+    getCFO_impl.cc
+    getSyncsymbol_impl.cc
+    getSignal_impl.cc
+    getEqsignal_impl.cc
+    getPayload_impl.cc
+    getEqlizedsig_impl.cc
+    recordBaseband_impl.cc
+    getBaseband_impl.cc
+    Serlizsig_impl.cc)
 
 set(customModule_sources
     "${customModule_sources}"

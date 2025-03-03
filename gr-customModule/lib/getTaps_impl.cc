@@ -18,7 +18,6 @@ namespace customModule {
 using input_type = gr_complex;
 getTaps::sptr 
 getTaps::make(
-     
                 int fft_len,
                 int cp_len,
                 bool propagate_channel_state,
@@ -58,7 +57,7 @@ getTaps_impl::getTaps_impl(
      d_channel_state(fft_len, gr_complex(1,0))                
   
 {   
-    std::cout << "working" <<std::endl;
+    // std::cout << "working" <<std::endl;
 
     if (d_fixed_frame_len < 0) {
         throw std::invalid_argument("Invalid frame length!");
@@ -99,6 +98,7 @@ int getTaps_impl::work(int noutput_items, // the length in items of all input an
     
     std::vector<tag_t> tags;
     get_tags_in_window(tags, 0, 0, 1);
+
     for (unsigned i = 0; i < tags.size(); i++) {
         if (pmt::symbol_to_string(tags[i].key) == "ofdm_sync_chan_taps") {
             d_channel_state = pmt::c32vector_elements(tags[i].value);// d_channel-state --> channel_taps
@@ -110,10 +110,18 @@ int getTaps_impl::work(int noutput_items, // the length in items of all input an
         }
         if (pmt::symbol_to_string(tags[i].key) == "ofdm_sync_carr_offset") {
             
-            carrier_offset = pmt::to_long(tags[i].value);//print out this value
+       
+            // carrier_offset = pmt::to_long(tags[i].value);//print out this value
+            // if (carrier_offset) {
+            //     carrier_offset_file << "Fine Grained CFO from the tag: " << carrier_offset << std::endl;
+            //     // carrier_offset_file << "taps_offset: " << carrier_offset << " ";
+            // } else {
+            //     carrier_offset_file << "No data" << std::endl;
+            //     carrier_offset_file << "\n";
 
-            carrier_offset_file << carrier_offset << " ";
-            carrier_offset_file << "\n";
+            // }
+
+
       
         }
         

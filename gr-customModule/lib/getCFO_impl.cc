@@ -57,6 +57,8 @@ namespace gr {
     {
       const float* in = (const float*)input_items[0];
       gr_complex* out =(gr_complex*)output_items[0];
+
+      freq_offsets_file << "Corase grained CFO starting: " << "\n" << std::endl;
  
       for (int i = 0; i < noutput_items; i++) {
 
@@ -67,12 +69,14 @@ namespace gr {
         float oi, oq;
         int32_t angle = gr::fxpt::float_to_fixed(d_phase);
         gr::fxpt::sincos(angle, &oq, &oi);
+        freq_offsets_file << in[i] << std::endl;
         // freq_offsets_file << "123123123123";
-        freq_offsets_file << oi << " " << oq << " ";
-        freq_offsets_file << "\n";
+        // freq_offsets_file << oi << " " << oq << " ";
+        // freq_offsets_file << "\n";
         // out[i] = gr_complex(oi, oq);
         }
-
+        freq_offsets_file << "Corase grained CFO ending" << "\n" << std::endl;
+      // freq_offsets_file.close();
       // Tell runtime system how many output items we produced.
       return noutput_items;
     }
