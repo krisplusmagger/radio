@@ -8,4 +8,12 @@
 
 install(FILES
     customModule_getTaps.block.yml
-    customModule_getCFO.block.yml DESTINATION share/gnuradio/grc/blocks)
+    customModule_getCFO.block.yml
+    customModule_getSyncsymbol.block.yml
+    customModule_getSignal.block.yml
+    customModule_getEqsignal.block.yml
+    customModule_getPayload.block.yml
+    customModule_getEqlizedsig.block.yml
+    customModule_recordBaseband.block.yml
+    customModule_getBaseband.block.yml
+    customModule_Serlizsig.block.yml DESTINATION share/gnuradio/grc/blocks)

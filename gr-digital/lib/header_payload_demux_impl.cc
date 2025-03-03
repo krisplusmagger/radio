@@ -93,7 +93,7 @@ header_payload_demux_impl::header_payload_demux_impl(
     : block("header_payload_demux",
             io_signature::make2(1, 2, itemsize, sizeof(char)),
             io_signature::make(
-                2, 2, (output_symbols ? itemsize * items_per_symbol : itemsize))),
+                2, 2, (output_symbols ? itemsize * items_per_symbol : itemsize))), //if output_symbols is true
       d_header_len(header_len),
       d_header_padding_symbols(header_padding / items_per_symbol),
       d_header_padding_items(header_padding % items_per_symbol),

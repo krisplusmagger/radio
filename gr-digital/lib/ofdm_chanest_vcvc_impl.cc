@@ -229,7 +229,7 @@ int ofdm_chanest_vcvc_impl::general_work(int noutput_items,
     // Channel info estimation
     int carr_offset = get_carr_offset(in, in + d_fft_len);
     std::vector<gr_complex> chan_taps(d_fft_len, 0);
-    get_chan_taps(in, in + d_fft_len, carr_offset, chan_taps);
+    get_chan_taps(in, in + d_fft_len, carr_offset, chan_taps); //in - > sync1,  in + d_fft_len -> sync2
     add_item_tag(0,
                  nitems_written(0),
                  pmt::string_to_symbol("ofdm_sync_carr_offset"),

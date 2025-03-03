@@ -11,4 +11,12 @@
 ########################################################################
 install(FILES api.h
     getTaps.h
-    getCFO.h DESTINATION include/gnuradio/customModule)
+    getCFO.h
+    getSyncsymbol.h
+    getSignal.h
+    getEqsignal.h
+    getPayload.h
+    getEqlizedsig.h
+    recordBaseband.h
+    getBaseband.h
+    Serlizsig.h DESTINATION include/gnuradio/customModule)

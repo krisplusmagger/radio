@@ -23,6 +23,14 @@ namespace py = pybind11;
 // BINDING_FUNCTION_PROTOTYPES(
     void bind_getTaps(py::module& m);
     void bind_getCFO(py::module& m);
+    void bind_getSyncsymbol(py::module& m);
+    void bind_getSignal(py::module& m);
+    void bind_getEqsignal(py::module& m);
+    void bind_getPayload(py::module& m);
+    void bind_getEqlizedsig(py::module& m);
+    void bind_recordBaseband(py::module& m);
+    void bind_getBaseband(py::module& m);
+    void bind_Serlizsig(py::module& m);
 // ) END BINDING_FUNCTION_PROTOTYPES
 
 
@@ -53,5 +61,13 @@ PYBIND11_MODULE(customModule_python, m)
     // BINDING_FUNCTION_CALLS(
     bind_getTaps(m);
     bind_getCFO(m);
+    bind_getSyncsymbol(m);
+    bind_getSignal(m);
+    bind_getEqsignal(m);
+    bind_getPayload(m);
+    bind_getEqlizedsig(m);
+    bind_recordBaseband(m);
+    bind_getBaseband(m);
+    bind_Serlizsig(m);
     // ) END BINDING_FUNCTION_CALLS
 }
