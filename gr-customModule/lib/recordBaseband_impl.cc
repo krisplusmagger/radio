@@ -23,8 +23,9 @@
 // - Port 3: cfo (new input port carrying CFO values from Frequency Mod)
 #define IN_PORT_INPUTDATA 0
 #define IN_PORT_TRIGGER   1
-#define IN_PORT_UNUSED    2
+#define IN_PORT_RAW       2
 #define IN_PORT_CFO       3
+// #define IN_PORT_RAW       4
 
 namespace gr {
   namespace customModule {
@@ -87,7 +88,8 @@ enum demux_states_t {
                         const std::vector<std::string>& special_tags,
                         const size_t header_padding,
                         const std::string& payload_filename,
-                        const std::string& cfo_filename)
+                        const std::string& cfo_filename,
+                        const std::string& rawiq_filename)
     {
       return gnuradio::make_block_sptr<recordBaseband_impl>(
                                                             header_len,
@@ -103,7 +105,8 @@ enum demux_states_t {
                                                             special_tags,
                                                             header_padding,
                                                             payload_filename,
-                                                            cfo_filename);
+                                                            cfo_filename,
+                                                            rawiq_filename);
     }
 
 
@@ -124,7 +127,8 @@ enum demux_states_t {
       const std::vector<std::string>& special_tags,
       const size_t header_padding,
       const std::string& payload_filename,
-      const std::string& cfo_filename)
+      const std::string& cfo_filename,
+      const std::string& rawiq_filename)
       : gr::block("recordBaseband",
             // Create a vector of 4 input ports:
             // Port 0: inputdata (itemsize), Port 1: trigger (sizeof(char)),
@@ -166,6 +170,10 @@ enum demux_states_t {
             cfo_file.open(cfo_filename, std::ios::out | std::ios::app);
             if(!cfo_file.is_open()) {
             throw std::runtime_error("Failed to open cfo_file file" + cfo_filename);
+            }
+            rawiq_file.open(rawiq_filename, std::ios::out | std::ios::app);
+            if(!rawiq_file.is_open()) {
+            throw std::runtime_error("Failed to open rawiq file" + rawiq_filename);
             }
           // Initialize the CFO buffer.
           d_cfo_buffer.clear();
@@ -223,7 +231,7 @@ enum demux_states_t {
       // Set requirements for ports 0, 1 and 2 (synchronous ports).
       ninput_items_required[IN_PORT_INPUTDATA] = n_items_reqd;
       ninput_items_required[IN_PORT_TRIGGER] = n_items_reqd;
-      ninput_items_required[IN_PORT_UNUSED] = n_items_reqd;
+      ninput_items_required[IN_PORT_RAW] = n_items_reqd;
       // For CFO port (port 3): require d_curr_payload_len items when in STATE_PAYLOAD, else 0.
     //   ninput_items_required[IN_PORT_CFO] = (d_state == STATE_PAYLOAD) ? d_curr_payload_len : 0;
       ninput_items_required[IN_PORT_CFO] = n_items_reqd;
@@ -260,6 +268,8 @@ enum demux_states_t {
     {
       const unsigned char *in = (const unsigned char *) input_items[IN_PORT_INPUTDATA];
       const unsigned char *in_cfo = (const unsigned char *) input_items[IN_PORT_CFO];
+    //   const unsigned char *in_raw = (const unsigned char *) input_items[IN_PORT_RAW];
+      const gr_complex *in_raw = (const gr_complex*)input_items[IN_PORT_RAW];
       const float *in_cfo_1 = (const float *) input_items[IN_PORT_CFO];
       unsigned char* out_header = (unsigned char*)output_items[PORT_HEADER];
       unsigned char* out_payload = (unsigned char*)output_items[PORT_PAYLOAD];
@@ -278,10 +288,11 @@ enum demux_states_t {
                         n_items_read_base + n_items_read + (items_to_consume)); \
       consume(IN_PORT_INPUTDATA, items_to_consume);                               \
       consume(IN_PORT_TRIGGER, items_to_consume);                                 \
-      consume(IN_PORT_UNUSED, items_to_consume);                                  \
+      consume(IN_PORT_RAW, items_to_consume);                                  \
       consume(IN_PORT_CFO, items_to_consume);                                     \
       n_items_read += (items_to_consume);                                         \
       in += (items_to_consume)*d_itemsize;                                        \
+      in_raw += items_to_consume;                                                 \
       in_cfo += (items_to_consume)*d_cfo_itemsize;                                \
       in_cfo_1 += (items_to_consume);                                                                 
 
@@ -376,13 +387,24 @@ enum demux_states_t {
                                d_curr_payload_len);              
                 // Record CFO values from the CFO port.
                 // const float* in_cfo_1 = (const float*)input_items[IN_PORT_CFO];
-                cfo_file << "CFO value: " << "\n" << std::endl;
+                cfo_file << "frame_length: " << d_curr_payload_len << " + CFO value: " << "\n" << std::endl;
                 for (int i = 0; i < d_curr_payload_len; i++) {
                     //start at i = i + d_gi, then do the loop item_per_symbol times, then start at i + dgi + items_per_symbol
                     for (int j = 0; j < d_items_per_symbol; j++) {           
                         // d_cfo_buffer.push_back(in_cfo[i]);
                         //write the cfo value into the files here
                         cfo_file << in_cfo_1[j + (i * d_items_per_symbol + d_gi)]  << std::endl; // how to 
+                    }
+    
+                }
+                rawiq_file << "frame_length: " << d_curr_payload_len << " + Raw Iq starting: " << "\n" << std::endl;
+                // how to make a cast here, 
+                for (int i = 0; i < d_curr_payload_len; i++) {
+                    //start at i = i + d_gi, then do the loop item_per_symbol times, then start at i + dgi + items_per_symbol
+                    for (int j = 0; j < d_items_per_symbol; j++) {           
+                        // d_cfo_buffer.push_back(in_cfo[i]);
+                        //write the cfo value into the files here
+                        rawiq_file << in_raw[j + (i * d_items_per_symbol + d_gi)]  << std::endl; // how to 
                     }
     
                 }
