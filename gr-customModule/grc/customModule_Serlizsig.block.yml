@@ -5,7 +5,7 @@ category: '[customModule]'
 templates:
   imports: from gnuradio import customModule
   make: customModule.Serlizsig(${fft_len}, ${occupied_carriers}, ${len_tag_key},
-        ${packet_len_tag_key}, ${symbols_skipped}, ${carr_offset_key}, ${input_is_shifted}, ${signal_filename })
+        ${packet_len_tag_key}, ${symbols_skipped}, ${carr_offset_key}, ${input_is_shifted}, ${signal_filename }, ${taps_filename})
 
 #  Make one 'parameters' list entry for every parameter you want settable from the GUI.
 #     Keys include:
@@ -48,6 +48,9 @@ parameters:
 -   id: signal_filename
     label: Signal Filename
     dtype: string      
+-   id: taps_filename
+    label: Taps Filename
+    dtype: string    
 #- id: ...
 #  label: ...
 #  dtype: ...

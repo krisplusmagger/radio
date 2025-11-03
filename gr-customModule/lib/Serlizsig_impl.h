@@ -26,6 +26,8 @@ namespace gr {
       int d_curr_set;                  //!< Current position in d_occupied_carriers
       int d_symbols_per_set;
       std::ofstream signal_file;
+      std::ofstream taps_file;
+      std::vector<gr_complex>d_channel_state;    
      protected:
           /*!
           * Calculate the number of scalar complex symbols given a number of
@@ -42,7 +44,8 @@ namespace gr {
                     int symbols_skipped,
                     const std::string& carr_offset_key,
                     bool input_is_shifted,
-                    const std::string& signal_filename);
+                    const std::string& signal_filename,
+                    const std::string& channel_taps_filename);
       ~Serlizsig_impl();
 
       // Where all the action really happens
