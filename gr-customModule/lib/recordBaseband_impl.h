@@ -49,6 +49,7 @@ namespace gr {
       std::vector<float> d_cfo_buffer;
       std::ofstream payload_file;
       std::ofstream cfo_file;
+      std::ofstream rawiq_file;
       static const pmt::pmt_t msg_port_id(); //!< Message Port Id
       void parse_header_data_msg(pmt::pmt_t header_data);
 
@@ -85,7 +86,8 @@ namespace gr {
                           const std::vector<std::string>& special_tags,
                           const size_t header_padding,
                           const std::string& payload_filename,
-                          const std::string& cfo_filename);
+                          const std::string& cfo_filename,
+                          const std::string& rawiq_filename);
       ~recordBaseband_impl();
 
       // Where all the action really happens

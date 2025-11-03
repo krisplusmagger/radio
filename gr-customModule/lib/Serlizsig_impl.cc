@@ -21,7 +21,8 @@ namespace gr {
                     int symbols_skipped,
                     const std::string& carr_offset_key,
                     bool input_is_shifted,
-                    const std::string& signal_filename
+                    const std::string& signal_filename,
+                    const std::string& channel_taps_filename
     )
     {
       return gnuradio::make_block_sptr<Serlizsig_impl>(fft_len,
@@ -31,7 +32,8 @@ namespace gr {
                                                       symbols_skipped,
                                                       carr_offset_key,
                                                       input_is_shifted,
-                                                      signal_filename
+                                                      signal_filename,
+                                                      channel_taps_filename
         );
     }
 
@@ -47,7 +49,8 @@ namespace gr {
       int symbols_skipped,
       const std::string& carr_offset_key,
       bool input_is_shifted,
-      const std::string& signal_filename)
+      const std::string& signal_filename,
+      const std::string& channel_taps_filename)
       : gr::tagged_stream_block("Serlizsig",
               gr::io_signature::make(1 /* min inputs */, 1 /* max inputs */, sizeof(gr_complex) * fft_len),
               gr::io_signature::make(0 /* min outputs */, 0 /*max outputs */, 0), len_tag_key),
@@ -59,11 +62,16 @@ namespace gr {
         d_symbols_skipped(symbols_skipped % occupied_carriers.size()),
         d_carr_offset_key(pmt::string_to_symbol(carr_offset_key)),
         d_curr_set(symbols_skipped % occupied_carriers.size()),
-        d_symbols_per_set(0)
+        d_symbols_per_set(0),
+        d_channel_state(fft_len, gr_complex(1, 0))
     {
       signal_file.open(signal_filename, std::ios::out | std::ios::app);
       if(!signal_file.is_open()) {
         throw std::runtime_error("Failed to open payload File" + signal_filename);
+      }
+      taps_file.open(channel_taps_filename, std::ios::out | std::ios::trunc);
+      if(!taps_file.is_open()) {
+        throw std::runtime_error("Failed to open taps File" + channel_taps_filename);
       }
       for (unsigned i = 0; i < d_occupied_carriers.size(); i++) {
         for (unsigned k = 0; k < d_occupied_carriers[i].size(); k++) {
@@ -120,14 +128,24 @@ namespace gr {
       long frame_length = ninput_items[0]; // Input frame
       long packet_length = 0;              // Output frame
       int carr_offset = 0;
+      int carrier_offset = 0;
       std::vector<tag_t> tags;
       // Packet mode
       if (!d_length_tag_key_str.empty()) {
           get_tags_in_range(tags, 0, nitems_read(0), nitems_read(0) + 1);
+        //   signal_file << "inside " << "\n" << std::endl;
           for (unsigned i = 0; i < tags.size(); i++) {
               if (tags[i].key == d_carr_offset_key) {
                   carr_offset = pmt::to_long(tags[i].value);
               }
+            if (pmt::symbol_to_string(tags[i].key) == "ofdm_sync_carr_offset") {
+                carrier_offset = pmt::to_long(tags[i].value);
+
+            }
+            if (pmt::symbol_to_string(tags[i].key) == "ofdm_sync_chan_taps") {
+                d_channel_state = pmt::c32vector_elements(tags[i].value);// d_channel-state --> channel_taps
+
+            }
               if (tags[i].key == d_packet_len_tag_key) {
                   packet_length = pmt::to_long(tags[i].value);
               }
@@ -150,22 +168,15 @@ namespace gr {
 
           // Copy symbols
     int n_out_symbols = 0;
+
+
+    signal_file << "Fine CFO: "  << carrier_offset << "\n " << std::endl;
+
     signal_file << "baseband_frame starting:  + frame_legnth"  << frame_length << "\n " << std::endl;
     for (int i = 0; i < frame_length; i++) {
-        // Copy all tags associated with this input OFDM symbol onto the first output
-        // symbol
-        // get_tags_in_range(tags, 0, nitems_read(0) + i, nitems_read(0) + i + 1);
-        // for (size_t t = 0; t < tags.size(); t++) {
-        //     // The packet length tag is not propagated
-        //     if (tags[t].key != d_packet_len_tag_key) {
-        //         add_item_tag(
-        //             0, nitems_written(0) + n_out_symbols, tags[t].key, tags[t].value);
-        //     }
-        // }
-        //here how to replace out using the outBuffer
+
         for (unsigned k = 0; k < d_occupied_carriers[d_curr_set].size(); k++) {
-        //   outBuffer[n_out_symbols++] =
-        //         in[i * d_fft_len + d_occupied_carriers[d_curr_set][k] + carr_offset];
+
                 signal_file << in[i * d_fft_len + d_occupied_carriers[d_curr_set][k] + carr_offset] << std::endl;
                 n_out_symbols++;
         }
@@ -176,6 +187,13 @@ namespace gr {
         d_curr_set = (d_curr_set + 1) % d_occupied_carriers.size();
     }
     signal_file << "baseband_frame end"  << "\n " << std::endl;
+
+    taps_file << "Taps starting: " << std::endl;
+    for (const auto& tap: d_channel_state) {
+        taps_file << tap << std::endl;
+    }
+        taps_file << "\n";
+        
   
 
     // Housekeeping
