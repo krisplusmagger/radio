@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Free Software Foundation, Inc.
+ * Copyright 2026 Free Software Foundation, Inc.
  *
  * This file is part of GNU Radio
  *
@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(1)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(getSignal.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(0aee507cb728b1be1072f38c9b9e6fc8)                     */
+/* BINDTOOL_HEADER_FILE_HASH(7e2e661c87818a310b62a46f2412c067)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -39,6 +39,7 @@ void bind_getSignal(py::module& m)
         .def(py::init(&getSignal::make),
            py::arg("item_size"),
            py::arg("signal_filename"),
+           py::arg("start_index_filename"),
            D(getSignal,make)
         )
         

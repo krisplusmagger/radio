@@ -63,7 +63,7 @@ int plateau_detector_fb_impl::general_work(int noutput_items,
             while (i < noutput_items && in[i] >= d_threshold)
                 i++;
             if ((i - flank_start) > 1) { // 1 Sample is not a plateau
-                out[flank_start + (i - flank_start) / 2] = 1;
+                o ut[flank_start + (i - flank_start) / 2] = 1;
                 i = std::min(i + d_max_len, noutput_items - 1);
             }
         }

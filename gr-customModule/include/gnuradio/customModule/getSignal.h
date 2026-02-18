@@ -9,7 +9,7 @@
 #define INCLUDED_CUSTOMMODULE_GETSIGNAL_H
 
 #include <gnuradio/customModule/api.h>
-#include <gnuradio/sync_block.h>
+#include <gnuradio/block.h>
 
 namespace gr {
   namespace customModule {
@@ -19,7 +19,7 @@ namespace gr {
      * \ingroup customModule
      *
      */
-    class CUSTOMMODULE_API getSignal : virtual public gr::sync_block
+    class CUSTOMMODULE_API getSignal : virtual public gr::block
     {
      public:
       typedef std::shared_ptr<getSignal> sptr;
@@ -34,7 +34,8 @@ namespace gr {
        */
       static sptr make(
           size_t item_size, 
-          const std::string& signal_filename);
+          const std::string& signal_filename,
+        const std::string& start_index_filename);
     };
 
   } // namespace customModule

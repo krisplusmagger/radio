@@ -19,18 +19,19 @@ namespace gr {
 
        const size_t d_item_size;
        std::ofstream signal_file;
+       std::ofstream start_index_file;
 
      public:
       getSignal_impl(size_t d_item_size, 
-                     const std::string& signal_filename);
+                     const std::string& signal_filename,
+                    const std::string& start_index_filename);
       ~getSignal_impl();
 
       // Where all the action really happens
-      int work(
-              int noutput_items,
-              gr_vector_const_void_star &input_items,
-              gr_vector_void_star &output_items
-      );
+    int general_work(int noutput_items,
+                     gr_vector_int& ninput_items,
+                     gr_vector_const_void_star& input_items,
+                     gr_vector_void_star& output_items) override;
     };
 
   } // namespace customModule

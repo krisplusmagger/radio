@@ -68,6 +68,10 @@ ofdm_sync_sc_cfb_impl::ofdm_sync_sc_cfb_impl(int fft_len,
     gr::blocks::sample_and_hold_ff::sptr sample_and_hold(
         gr::blocks::sample_and_hold_ff::make());
 
+
+
+
+        
     gr::blocks::plateau_detector_fb::sptr plateau_detector(
         gr::blocks::plateau_detector_fb::make(cp_len, threshold));
 

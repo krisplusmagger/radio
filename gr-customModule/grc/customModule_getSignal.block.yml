@@ -4,7 +4,7 @@ category: '[customModule]'
 
 templates:
   imports: from gnuradio import customModule
-  make: customModule.getSignal(${type.size}, ${signal_filename})
+  make: customModule.getSignal(${type.size}, ${signal_filename}, ${start_index_filename})
 
 #  Make one 'parameters' list entry for every parameter you want settable from the GUI.
 #     Keys include:
@@ -22,7 +22,10 @@ parameters:
             gr.sizeof_char]
 - id: signal_filename
   label: Signal Filename
-  dtype: string            
+  dtype: string           
+- id: start_index_filename
+  label: Start Index Filename
+  dtype: string       
 #- id: ...
 #  label: ...
 #  dtype: ...
@@ -40,9 +43,9 @@ inputs:
 #  vlen: ...
 #  optional: ...
 
-outputs:
-- domain: message
-  dtype: int
+# outputs:
+# - domain: message
+#   dtype: int
 #  vlen: ...
 #  optional: ...
 
