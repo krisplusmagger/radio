@@ -11,3 +11,4 @@ gr-digital/examples/ofdm/freq_offsets_testing.txt
 gr-digital/examples/ofdm/offsets_*.txt
 
 gr-ieee802-11/examples/*.txt
+gr-ieee802-15/examples/*.txt
