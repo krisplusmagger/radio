@@ -94,7 +94,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [216, 560.0]
+    coordinate: [224, 576.0]
     rotation: 0
     state: enabled
 - name: blocks_float_to_complex_0
@@ -110,7 +110,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [592, 576.0]
+    coordinate: [608, 536.0]
     rotation: 0
     state: enabled
 - name: blocks_multiply_xx_0
@@ -202,7 +202,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [344, 552.0]
+    coordinate: [384, 552.0]
     rotation: 0
     state: enabled
 - name: blocks_tagged_stream_multiply_length_0
@@ -244,6 +244,40 @@ blocks:
     coordinate: [1216, 392.0]
     rotation: 180
     state: enabled
+- name: customModule_getSignal_0
+  id: customModule_getSignal
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    length: ''
+    signal_filename: '"MM_output.txt"'
+    start_index_filename: ''
+    type: float
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1240, 592.0]
+    rotation: 0
+    state: disabled
+- name: customModule_getSignal_0_0
+  id: customModule_getSignal
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    length: ''
+    signal_filename: Quadrature_output.txt"
+    start_index_filename: ''
+    type: float
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [928, 624.0]
+    rotation: 0
+    state: disabled
 - name: digital_chunks_to_symbols_xx_0
   id: digital_chunks_to_symbols_xx
   parameters:
@@ -552,11 +586,13 @@ connections:
 - [blocks_multiply_xx_0, '0', blocks_tagged_stream_multiply_length_0, '0']
 - [blocks_packed_to_unpacked_xx_0, '0', digital_chunks_to_symbols_xx_0, '0']
 - [blocks_repeat_0, '0', blocks_multiply_xx_0, '1']
+- [blocks_sub_xx_0, '0', customModule_getSignal_0_0, '0']
 - [blocks_sub_xx_0, '0', digital_clock_recovery_mm_xx_0, '0']
 - [blocks_tag_gate_0, '0', blocks_float_to_complex_0, '1']
 - [blocks_tagged_stream_multiply_length_0, '0', foo_packet_pad2_0, '0']
 - [blocks_vector_source_x_0, '0', blocks_multiply_xx_0, '0']
 - [digital_chunks_to_symbols_xx_0, '0', blocks_repeat_0, '0']
+- [digital_clock_recovery_mm_xx_0, '0', customModule_getSignal_0, '0']
 - [digital_clock_recovery_mm_xx_0, '0', ieee802_15_4_packet_sink_0, '0']
 - [foo_packet_pad2_0, '0', blocks_complex_to_float_0, '0']
 - [ieee802_15_4_access_code_prefixer_0, out, pdu_pdu_to_tagged_stream_0, pdus]

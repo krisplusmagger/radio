@@ -14,7 +14,7 @@ fft.shift <- function(sym) {
 ### symbols as defined in the standard
 sym <- c(1, 1, -1, -1, 1, 1, -1, 1, -1, 1, 1, 1, 1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1, 1, 1, 1, 0, 1, -1, -1, 1, 1, -1, 1, -1, 1, -1, -1, -1, -1, -1, 1, 1, -1, -1, 1, -1, 1, -1, 1, 1, 1, 1)
 freq <- c(rep(0, 6), sym, rep(0, 5))
-
+### the number of nonzero bits in each words is 52
 pre <- fft(fft.shift(freq), inverse=T) / sqrt(52)
 pre <- Conj(pre)
 pre <- rev(pre)

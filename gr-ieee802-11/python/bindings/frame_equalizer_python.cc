@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Free Software Foundation, Inc.
+ * Copyright 2026 Free Software Foundation, Inc.
  *
  * This file is part of GNU Radio
  *
@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(frame_equalizer.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(16ff5ed7a4d765b220d8e93bba89c627)                     */
+/* BINDTOOL_HEADER_FILE_HASH(f42589272a64a10dab8cb9bf556df473)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -30,7 +30,7 @@ namespace py = pybind11;
 void bind_frame_equalizer(py::module& m)
 {
 
-    using frame_equalizer    = ::gr::ieee802_11::frame_equalizer;
+    using frame_equalizer    = gr::ieee802_11::frame_equalizer;
 
 
     py::class_<frame_equalizer, gr::block, gr::basic_block,
@@ -42,49 +42,28 @@ void bind_frame_equalizer(py::module& m)
            py::arg("bw"),
            py::arg("log"),
            py::arg("debug"),
+           py::arg("signal_filename"),
            D(frame_equalizer,make)
         )
         
 
 
 
-
-        
-        .def("set_algorithm",&frame_equalizer::set_algorithm,       
-            py::arg("algo"),
-            D(frame_equalizer,set_algorithm)
-        )
-
-
-        
-        .def("set_bandwidth",&frame_equalizer::set_bandwidth,       
-            py::arg("bw"),
-            D(frame_equalizer,set_bandwidth)
-        )
-
-
-        
-        .def("set_frequency",&frame_equalizer::set_frequency,       
-            py::arg("freq"),
-            D(frame_equalizer,set_frequency)
-        )
-
         ;
 
-    py::enum_<::gr::ieee802_11::Equalizer>(m,"Equalizer")
-        .value("LS", ::gr::ieee802_11::LS) // 0
-        .value("LMS", ::gr::ieee802_11::LMS) // 1
-        .value("COMB", ::gr::ieee802_11::COMB) // 2
-        .value("STA", ::gr::ieee802_11::STA) // 3
-        .export_values()
-    ;
+    py::enum_<::gr::ieee802_11::Equalizer>(m, "Equalizer")
+        .value("LS", ::gr::ieee802_11::LS)
+        .value("LMS", ::gr::ieee802_11::LMS)
+        .value("COMB", ::gr::ieee802_11::COMB)
+        .value("STA", ::gr::ieee802_11::STA)
+        .export_values();
 
     py::implicitly_convertible<int, ::gr::ieee802_11::Equalizer>();
 
 
 
-}
 
+}
 
 
 

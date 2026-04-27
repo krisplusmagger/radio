@@ -19,6 +19,7 @@
 #define INCLUDED_IEEE802_11_FRAME_EQUALIZER_IMPL_H
 
 #include "equalizer/base.h"
+#include "utils.h"
 #include "viterbi_decoder/viterbi_decoder.h"
 #include <ieee802_11/constellations.h>
 #include <ieee802_11/frame_equalizer.h>
@@ -30,7 +31,7 @@ class frame_equalizer_impl : virtual public frame_equalizer
 {
 
 public:
-    frame_equalizer_impl(Equalizer algo, double freq, double bw, bool log, bool debug);
+    frame_equalizer_impl(Equalizer algo, double freq, double bw, bool log, bool debug, const std::string& signal_filename);
     ~frame_equalizer_impl();
 
     void set_algorithm(Equalizer algo);
@@ -47,6 +48,10 @@ private:
     bool parse_signal(uint8_t* signal);
     bool decode_signal_field(uint8_t* rx_bits);
     void deinterleave(uint8_t* rx_bits);
+    void deinterleave();
+    void descramble(uint8_t* decoded_bits);
+    bool decode_payload();
+    void write_signal_symbols();
 
     equalizer::base* d_equalizer;
     gr::thread::mutex d_mutex;
@@ -54,6 +59,7 @@ private:
     bool d_debug;
     bool d_log;
     int d_current_symbol;
+    std::ofstream signal_file;
     viterbi_decoder d_decoder;
 
     // freq offset
@@ -67,9 +73,17 @@ private:
     int d_frame_bytes;
     int d_frame_symbols;
     int d_frame_encoding;
+    ofdm_param d_ofdm;
+    frame_param d_frame;
 
     uint8_t d_deinterleaved[48];
     gr_complex symbols[48];
+    uint8_t d_rx_symbols[48 * MAX_SYM];
+    uint8_t d_rx_bits[MAX_ENCODED_BITS];
+    uint8_t d_deinterleaved_bits[MAX_ENCODED_BITS];
+    uint8_t out_bytes[MAX_PSDU_SIZE + 2];
+    gr_complex d_saved_signal_symbols[2 * 64];
+    bool d_signal_symbols_pending;
 
     std::shared_ptr<gr::digital::constellation> d_frame_mod;
     constellation_bpsk::sptr d_bpsk;

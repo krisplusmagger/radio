@@ -22,21 +22,22 @@
 #include "equalizer/sta.h"
 #include "frame_equalizer_impl.h"
 #include "utils.h"
+#include <boost/crc.hpp>
 #include <gnuradio/io_signature.h>
 
 namespace gr {
 namespace ieee802_11 {
 
 frame_equalizer::sptr
-frame_equalizer::make(Equalizer algo, double freq, double bw, bool log, bool debug)
+frame_equalizer::make(Equalizer algo, double freq, double bw, bool log, bool debug, const std::string& signal_filename)
 {
     return gnuradio::get_initial_sptr(
-        new frame_equalizer_impl(algo, freq, bw, log, debug));
+        new frame_equalizer_impl(algo, freq, bw, log, debug, signal_filename));
 }
 
 
 frame_equalizer_impl::frame_equalizer_impl(
-    Equalizer algo, double freq, double bw, bool log, bool debug)
+    Equalizer algo, double freq, double bw, bool log, bool debug, const std::string& signal_filename)
     : gr::block("frame_equalizer",
                 gr::io_signature::make(1, 1, 64 * sizeof(gr_complex)),
                 gr::io_signature::make(1, 1, 48)),
@@ -48,10 +49,21 @@ frame_equalizer_impl::frame_equalizer_impl(
       d_bw(bw),
       d_frame_bytes(0),
       d_frame_symbols(0),
-      d_freq_offset_from_synclong(0.0)
+      d_ofdm(BPSK_1_2),
+      d_frame(d_ofdm, 0),
+      d_freq_offset_from_synclong(0.0),
+      d_signal_symbols_pending(false)
 {
 
+
+    std::ofstream(signal_filename).close();
+    signal_file.open(signal_filename, std::ios::out | std::ios::app);
+
+    if(!signal_file.is_open()) {
+        throw std::runtime_error("Failed to open signal files: " + signal_filename);
+    }
     message_port_register_out(pmt::mp("symbols"));
+    message_port_register_out(pmt::mp("tx_feedback"));
 
     d_bpsk = constellation_bpsk::make();
     d_qpsk = constellation_qpsk::make();
@@ -126,6 +138,7 @@ int frame_equalizer_impl::general_work(int noutput_items,
 
     int i = 0;
     int o = 0;
+
     gr_complex symbols[48];
     gr_complex current_symbol[64];
 
@@ -141,6 +154,7 @@ int frame_equalizer_impl::general_work(int noutput_items,
             d_current_symbol = 0;
             d_frame_symbols = 0;
             d_frame_mod = d_bpsk;
+            d_signal_symbols_pending = false;
 
             d_freq_offset_from_synclong =
                 pmt::to_double(tags.front().value) * d_bw / (2 * M_PI);
@@ -208,10 +222,26 @@ int frame_equalizer_impl::general_work(int noutput_items,
             d_er = (1 - alpha) * d_er + alpha * er;
         }
 
+
+ 
+
         // do equalization
         d_equalizer->equalize(
-            current_symbol, d_current_symbol, symbols, out + o * 48, d_frame_mod);
+            current_symbol, d_current_symbol, symbols, out + o * 48, d_frame_mod); // write the equalized bits to out
 
+        //  add anohter pointer gr_complex* out_zigbee
+        // for i=0...5, out_zigbee[i] = current_symbol[i], then remain the rest, wer got the new array filled with the data from the zigbee //
+        //and in frame_equyalizer_impl.cc we can access that array and create another output port
+        // here if i change it to 64, does that mean it will copy 64 data at one time?
+        // std::memcpy(out_zigbee + d_current_symbol * 64, current_symbol,  64 * sizeof(gr_complex));
+        // int o_zigbee = 0;
+        if (d_current_symbol < 2) {
+            std::memcpy(d_saved_signal_symbols + d_current_symbol * 64,
+                        current_symbol,
+                        64 * sizeof(gr_complex));
+            d_signal_symbols_pending = true;
+        }
+  
         // signal field
         if (d_current_symbol == 2) {
 
@@ -244,10 +274,23 @@ int frame_equalizer_impl::general_work(int noutput_items,
                                  pmt::cdr(pair),
                                  alias_pmt());
                 }
+            } else if (d_signal_symbols_pending) {
+                message_port_pub(pmt::mp("tx_feedback"), pmt::intern("nack"));
+                d_signal_symbols_pending = false;
             }
         }
 
         if (d_current_symbol > 2) {
+            std::memcpy(d_rx_symbols + (d_current_symbol - 3) * 48, out + o * 48, 48);
+
+            if (d_current_symbol == d_frame_symbols + 2) {
+                if (decode_payload()) {
+                    write_signal_symbols();
+                } else {
+                    d_signal_symbols_pending = false;
+                }
+            }
+
             o++;
             pmt::pmt_t pdu = pmt::make_dict();
             message_port_pub(
@@ -359,11 +402,113 @@ bool frame_equalizer_impl::parse_signal(uint8_t* decoded_bits)
         return false;
     }
 
+    ofdm_param ofdm = ofdm_param((Encoding)d_frame_encoding);
+    frame_param frame = frame_param(ofdm, d_frame_bytes);
+
+    if (frame.n_sym > MAX_SYM || frame.psdu_size > MAX_PSDU_SIZE) {
+        dout << "Dropping frame which is too large (symbols or bits)" << std::endl;
+        d_frame_symbols = 0;
+        d_signal_symbols_pending = false;
+        return false;
+    }
+
+    d_ofdm = ofdm;
+    d_frame = frame;
+    d_frame_symbols = d_frame.n_sym;
+
     mylog("encoding: {} - length: {} - symbols: {}",
           d_frame_encoding,
           d_frame_bytes,
           d_frame_symbols);
     return true;
+}
+
+void frame_equalizer_impl::deinterleave()
+{
+    int n_cbps = d_ofdm.n_cbps;
+    int first[MAX_BITS_PER_SYM];
+    int second[MAX_BITS_PER_SYM];
+    int s = std::max(d_ofdm.n_bpsc / 2, 1);
+
+    for (int j = 0; j < n_cbps; j++) {
+        first[j] = s * (j / s) + ((j + int(floor(16.0 * j / n_cbps))) % s);
+    }
+
+    for (int i = 0; i < n_cbps; i++) {
+        second[i] = 16 * i - (n_cbps - 1) * int(floor(16.0 * i / n_cbps));
+    }
+
+    for (int i = 0; i < d_frame.n_sym * 48; i++) {
+        for (int k = 0; k < d_ofdm.n_bpsc; k++) {
+            d_rx_bits[i * d_ofdm.n_bpsc + k] = !!(d_rx_symbols[i] & (1 << k));
+        }
+    }
+
+    for (int i = 0; i < d_frame.n_sym; i++) {
+        for (int k = 0; k < n_cbps; k++) {
+            d_deinterleaved_bits[i * n_cbps + second[first[k]]] =
+                d_rx_bits[i * n_cbps + k];
+        }
+    }
+}
+
+void frame_equalizer_impl::descramble(uint8_t* decoded_bits)
+{
+    int state = 0;
+    std::memset(out_bytes, 0, d_frame.psdu_size + 2);
+
+    for (int i = 0; i < 7; i++) {
+        if (decoded_bits[i]) {
+            state |= 1 << (6 - i);
+        }
+    }
+    out_bytes[0] = state;
+
+    int feedback;
+    int bit;
+
+    for (int i = 7; i < d_frame.psdu_size * 8 + 16; i++) {
+        feedback = ((!!(state & 64))) ^ (!!(state & 8));
+        bit = feedback ^ (decoded_bits[i] & 0x1);
+        out_bytes[i / 8] |= bit << (i % 8);
+        state = ((state << 1) & 0x7e) | feedback;
+    }
+}
+
+bool frame_equalizer_impl::decode_payload()
+{
+    deinterleave();
+    uint8_t* decoded = d_decoder.decode(&d_ofdm, &d_frame, d_deinterleaved_bits);
+    descramble(decoded);
+
+    boost::crc_32_type result;
+    result.process_bytes(out_bytes + 2, d_frame.psdu_size);
+
+    if (result.checksum() != 558161692) {
+        dout << "payload checksum wrong -- dropping saved signal symbols" << std::endl;
+        message_port_pub(pmt::mp("tx_feedback"), pmt::intern("nack"));
+        return false;
+    }
+
+    message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
+    return true;
+}
+
+void frame_equalizer_impl::write_signal_symbols()
+{
+    if (!d_signal_symbols_pending) {
+        return;
+    }
+
+    for (int symbol = 0; symbol < 2; symbol++) {
+        for (int i = 0; i < 64; i++) {
+            signal_file << d_saved_signal_symbols[symbol * 64 + i] << "\n";
+        }
+        signal_file << "xx"
+                    << "\n";
+    }
+    signal_file.flush();
+    d_signal_symbols_pending = false;
 }
 
 const int frame_equalizer_impl::interleaver_pattern[48] = {

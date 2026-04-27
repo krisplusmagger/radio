@@ -18,11 +18,13 @@ namespace gr {
      private:
 
        const size_t d_item_size;
+       const int d_input_len;
        std::ofstream signal_file;
        std::ofstream start_index_file;
 
      public:
-      getSignal_impl(size_t d_item_size, 
+      getSignal_impl( int input_len,
+                      size_t d_item_size, 
                      const std::string& signal_filename,
                     const std::string& start_index_filename);
       ~getSignal_impl();

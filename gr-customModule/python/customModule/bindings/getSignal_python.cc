@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(1)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(getSignal.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(7e2e661c87818a310b62a46f2412c067)                     */
+/* BINDTOOL_HEADER_FILE_HASH(c668266c492123f6934b79bc2c7f63f2)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -37,6 +37,7 @@ void bind_getSignal(py::module& m)
         std::shared_ptr<getSignal>>(m, "getSignal", D(getSignal))
 
         .def(py::init(&getSignal::make),
+           py::arg("input_len"),
            py::arg("item_size"),
            py::arg("signal_filename"),
            py::arg("start_index_filename"),

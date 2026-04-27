@@ -47,6 +47,9 @@ public:
           d_debug(debug),
           d_offset(0),
           d_state(SYNC),
+          d_short_raw_index(0),
+          d_short_tag_in_offset(0),
+          d_have_short_raw(false),
           SYNC_LENGTH(sync_length)
     {
 
@@ -74,13 +77,15 @@ public:
         int ninput = std::min(std::min(ninput_items[0], ninput_items[1]), 8192);
 
         const uint64_t nread = nitems_read(0);
-        get_tags_in_range(d_tags, 0, nread, nread + ninput,
+        get_tags_in_range(d_tags_start, 0, nread, nread + ninput,
                            pmt::string_to_symbol("wifi_start"));
-                           ///test ssss
-        if (d_tags.size()) {
-            std::sort(d_tags.begin(), d_tags.end(), gr::tag_t::offset_compare);
+        get_tags_in_range(d_tags_raw, 0, nread, nread + ninput,
+                    pmt::string_to_symbol("wifi_start_raw"));
 
-            const uint64_t offset = d_tags.front().offset;
+        if (d_tags_start.size()) {
+            std::sort(d_tags_start.begin(), d_tags_start.end(), gr::tag_t::offset_compare);
+
+            const uint64_t offset = d_tags_start.front().offset;
 
             if (offset > nread) {
                 ninput = offset - nread;
@@ -91,7 +96,21 @@ public:
                 if (d_state == COPY) {
                     d_state = RESET;
                 }
-                d_freq_offset_short = pmt::to_double(d_tags.front().value);
+                // short CFO estimate from, wifi_start
+                d_freq_offset_short = pmt::to_double(d_tags_start.front().value);
+                //where the wifi_start tag on sync_long input
+                d_short_tag_in_offset = offset;
+
+                
+                // d_have_short_raw = false;
+                // try to find wifi_start_raw at the same offset
+                for(const auto tr: d_tags_raw) {
+                    if (tr.offset == offset) {
+                        d_short_raw_index = pmt::to_uint64(tr.value);
+                        d_have_short_raw = true;
+                        break;
+                    }
+                }
             }
         }
 
@@ -102,6 +121,7 @@ public:
         switch (d_state) {
 
         case SYNC:
+            // ninput - 63 is the number of outputs
             d_fir.filterN(
                 d_correlation, in, std::min(SYNC_LENGTH, std::max(ninput - 63, 0)));
 
@@ -136,6 +156,17 @@ public:
                                  pmt::string_to_symbol("wifi_start"),
                                  pmt::from_double(d_freq_offset_short - d_freq_offset),
                                  pmt::string_to_symbol(name()));
+                    if (d_have_short_raw) {
+                        const uint64_t input_abs = nitems_read(0) + i;
+                        const uint64_t delta = input_abs - d_short_tag_in_offset;
+                        const uint64_t raw_actual = d_short_raw_index + delta;
+
+                        add_item_tag(0,
+                                    nitems_written(0),
+                                    pmt::string_to_symbol("wifi_start_raw_long"),
+                                    pmt::from_uint64(raw_actual),
+                                    pmt::string_to_symbol(name()));
+                    }
                 }
 
                 if (rel >= 0 && (rel < 128 || ((rel - 128) % 80) > 15)) {
@@ -201,13 +232,14 @@ public:
 
         // in case we don't find anything use SYNC_LENGTH
         d_frame_start = SYNC_LENGTH;
-
+        // d_cor.push_back(pair<gr_complex, int>(d_correlation[i], d_offset));
         for (int i = 0; i < 3; i++) {
             for (int k = i + 1; k < 4; k++) {
                 gr_complex first;
                 gr_complex second;
+                // get<1>(vec(x_) sample index(time offset) of that peak
                 if (get<1>(vec[i]) > get<1>(vec[k])) {
-                    first = get<0>(vec[k]);
+                    first = get<0>(vec[k]); // correlation value
                     second = get<0>(vec[i]);
                 } else {
                     first = get<0>(vec[i]);
@@ -238,10 +270,14 @@ private:
     int d_frame_start;
     float d_freq_offset;
     double d_freq_offset_short;
+    uint64_t d_short_tag_in_offset; //offset of wifi_start tag on sync_long input
+    uint64_t d_short_raw_index; // value from tag: wifi_start_raw (real raw index)
+    bool d_have_short_raw = false;
 
     gr_complex* d_correlation;
     list<pair<gr_complex, int>> d_cor;
-    std::vector<gr::tag_t> d_tags;
+    // std::vector<gr::tag_t> d_tags;
+    std::vector<gr::tag_t> d_tags_start, d_tags_raw;
     gr::filter::kernel::fir_filter_ccc d_fir;
 
     const bool d_log;

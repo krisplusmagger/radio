@@ -20,7 +20,7 @@
 #include <iostream>
 
 using namespace gr::ieee802_11::equalizer;
-
+// base::LONG[] equals the long_norm
 const gr_complex base::LONG[] = { 0,  0,  0,  0,  0,  0,  1,  1,  -1, -1, 1,  1,  -1,
                                   1,  -1, 1,  1,  1,  1,  1,  1,  -1, -1, 1,  1,  -1,
                                   1,  -1, 1,  1,  1,  1,  0,  1,  -1, -1, 1,  1,  -1,

@@ -33,6 +33,7 @@ namespace gr {
        * creating new instances.
        */
       static sptr make(
+          int input_len,
           size_t item_size, 
           const std::string& signal_filename,
         const std::string& start_index_filename);

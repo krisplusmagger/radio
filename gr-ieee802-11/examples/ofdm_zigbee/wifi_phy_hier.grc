@@ -330,7 +330,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [736, 792.0]
+    coordinate: [720, 800.0]
     rotation: 0
     state: enabled
 - name: customModule_getSignal_0_0
@@ -347,7 +347,24 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1080, 944.0]
+    coordinate: [1128, 928.0]
+    rotation: 0
+    state: enabled
+- name: customModule_getSignal_0_0_0
+  id: customModule_getSignal
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    length: '6'
+    signal_filename: '"zigbee.txt"'
+    start_index_filename: '"nithinggg.txt"'
+    type: complex
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [824, 1304.0]
     rotation: 0
     state: enabled
 - name: digital_chunks_to_symbols_xx_0
@@ -597,12 +614,11 @@ blocks:
     log: 'False'
     maxoutbuf: '0'
     minoutbuf: '0'
-    signal_filename: '"zigbee_test.txt"'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [848, 1108.0]
+    coordinate: [840, 1128.0]
     rotation: 180
     state: enabled
 - name: ieee802_11_mapper_0
@@ -655,7 +671,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [480, 1192.0]
+    coordinate: [616, 1216.0]
     rotation: 180
     state: enabled
 - name: pad_sink_2
@@ -674,24 +690,6 @@ blocks:
     bus_source: false
     bus_structure: null
     coordinate: [376, 1096.0]
-    rotation: 180
-    state: enabled
-- name: pad_sink_3
-  id: pad_sink
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: ''
-    label: tx_feedback
-    num_streams: '1'
-    optional: 'True'
-    type: message
-    vlen: '1'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [480, 1288.0]
     rotation: 180
     state: enabled
 - name: pad_source_0
@@ -813,7 +811,6 @@ connections:
 - [ieee802_11_decode_mac_0, out, pad_sink_2, in]
 - [ieee802_11_frame_equalizer_0, '0', ieee802_11_decode_mac_0, '0']
 - [ieee802_11_frame_equalizer_0, symbols, pad_sink_1, in]
-- [ieee802_11_frame_equalizer_0, tx_feedback, pad_sink_3, in]
 - [ieee802_11_mapper_0, '0', digital_packet_headergenerator_bb_0, '0']
 - [ieee802_11_mapper_0, '0', ieee802_11_chunks_to_symbols_xx_0, '0']
 - [pad_source_0, '0', blocks_complex_to_mag_squared_0, '0']

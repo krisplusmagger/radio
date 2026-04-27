@@ -29,6 +29,9 @@ parameters:
     default: 'False'
     options: ['True', 'False']
     option_labels: [Enable, Disable]
+-   id: signal_filename
+    label: Signal Filename
+    dtype: string   
 
 inputs:
 -   domain: stream
@@ -44,10 +47,13 @@ outputs:
 -   domain: message
     id: symbols
     optional: true
+-   domain: message
+    id: tx_feedback
+    optional: true
 
 templates:
     imports: import ieee802_11
-    make: ieee802_11.frame_equalizer(${algo}, ${freq}, ${bw}, ${log}, ${debug})
+    make: ieee802_11.frame_equalizer(${algo}, ${freq}, ${bw}, ${log}, ${debug}, ${signal_filename})
     callbacks:
     - set_algorithm(${algo})
     - set_frequency(${freq})

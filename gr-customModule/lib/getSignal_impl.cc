@@ -16,20 +16,21 @@ namespace gr {
 
     // using output_type = float;
     getSignal::sptr
-    getSignal::make(size_t item_size, const std::string& signal_filename, const std::string& start_index_filename)
+    getSignal::make(int input_len, size_t item_size, const std::string& signal_filename, const std::string& start_index_filename)
     {
-      return gnuradio::make_block_sptr<getSignal_impl>(item_size, signal_filename, start_index_filename);
+      return gnuradio::make_block_sptr<getSignal_impl>(input_len, item_size, signal_filename, start_index_filename);
     }
 
 
     /*
      * The private constructor
      */
-    getSignal_impl::getSignal_impl(size_t item_size, const std::string& signal_filename, const std::string& start_index_filename)
+    getSignal_impl::getSignal_impl(int input_len, size_t item_size, const std::string& signal_filename, const std::string& start_index_filename)
       : gr::block("getSignal",
-              gr::io_signature::make(1 /* min inputs */, 1 /* max inputs */, item_size),
+              gr::io_signature::make(1 /* min inputs */, 1 /* max inputs */, input_len * item_size),
               gr::io_signature::make(0/* min outputs */, 0 /*max outputs */, 0)),
-        d_item_size(item_size)
+        d_item_size(item_size),
+        d_input_len(input_len)
     { 
         std::ofstream(signal_filename).close();
         signal_file.open(signal_filename, std::ios::out | std::ios::app);
@@ -84,6 +85,14 @@ namespace gr {
                   << "\n";
 
             }
+            if (key == "wifi_start_raw_long") {
+                start_index_file
+                  << "offset=" << t.offset
+                  << " key=" << key
+                  << " value=" << pmt::write_string(t.value)
+                  << "\n";
+
+            }
 
             
         }
@@ -94,9 +103,13 @@ namespace gr {
         // here i need to get all the tags in the input and write these tags 
         // to start_index file
 
-        for (int i = 0; i < nin; i++) {
-            signal_file << in[i] << "\n";
+        for (int item = 0; item < nin; item++) {
+          for (int k = 0; k < d_input_len; k++) {
+            signal_file << in[item * d_input_len + k] << "\n";
+          }
         }
+
+        signal_file << "xx" << "\n";
 
 
         consume_each(nin);

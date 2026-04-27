@@ -22,7 +22,6 @@
 
 #include <gnuradio/block.h>
 #include <ieee802_11/api.h>
-
 namespace gr {
 namespace ieee802_11 {
 
@@ -39,7 +38,7 @@ class IEEE802_11_API frame_equalizer : virtual public gr::block
 
 public:
     typedef std::shared_ptr<frame_equalizer> sptr;
-    static sptr make(Equalizer algo, double freq, double bw, bool log, bool debug);
+    static sptr make(Equalizer algo, double freq, double bw, bool log, bool debug, const std::string& signal_filename);
     virtual void set_algorithm(Equalizer algo) = 0;
     virtual void set_bandwidth(double bw) = 0;
     virtual void set_frequency(double freq) = 0;
