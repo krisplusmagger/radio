@@ -23,6 +23,8 @@
 #include "viterbi_decoder/viterbi_decoder.h"
 #include <ieee802_11/constellations.h>
 #include <ieee802_11/frame_equalizer.h>
+#include <string>
+#include <vector>
 
 namespace gr {
 namespace ieee802_11 {
@@ -50,14 +52,36 @@ private:
     void deinterleave(uint8_t* rx_bits);
     void deinterleave();
     void descramble(uint8_t* decoded_bits);
-    bool decode_payload();
+    bool decode_payload(const uint8_t* rx_symbols, bool publish_feedback);
     void write_signal_symbols();
+    equalizer::base* create_equalizer(Equalizer algo) const;
+    bool load_complex_csv_skip_header(const std::string& path,
+                                      int real_col,
+                                      int imag_col,
+                                      std::vector<gr_complex>& out);
+    bool load_reference_data();
+    void reset_frame_capture();
+    bool run_equalizer_attempt(gr_complex* frame_symbols,
+                               uint8_t* out_bits,
+                               std::vector<gr_complex>& out_symbols);
+    gr_complex estimate_zigbee_channel() const;
+    bool get_zigbee_reference_symbol_fft(int symbol_idx, gr_complex* fft_symbol) const;
+    void subtract_zigbee_interference(gr_complex h,
+                                      gr_complex* frame_symbols,
+                                      int total_symbols) const;
+    bool try_decode_with_salvage(uint8_t* final_bits,
+                                 std::vector<gr_complex>& final_symbols,
+                                 bool& salvaged);
+    int flush_pending_output(uint8_t* out, int noutput_items);
+    void publish_payload_symbols(const std::vector<gr_complex>& payload_symbols);
+    void write_correction_stats();
 
     equalizer::base* d_equalizer;
     gr::thread::mutex d_mutex;
     std::vector<gr::tag_t> tags;
     bool d_debug;
     bool d_log;
+    Equalizer d_algorithm;
     int d_current_symbol;
     std::ofstream signal_file;
     viterbi_decoder d_decoder;
@@ -83,7 +107,22 @@ private:
     uint8_t d_deinterleaved_bits[MAX_ENCODED_BITS];
     uint8_t out_bytes[MAX_PSDU_SIZE + 2];
     gr_complex d_saved_signal_symbols[2 * 64];
+    gr_complex d_captured_symbols[(MAX_SYM + 3) * 64];
+    uint8_t d_pending_output_bits[48 * MAX_SYM];
+    std::vector<gr_complex> d_pending_payload_symbols;
     bool d_signal_symbols_pending;
+    bool d_signal_valid;
+    int d_captured_symbol_count;
+    int d_pending_output_items;
+    int d_pending_output_offset;
+    pmt::pmt_t d_pending_meta;
+    std::string d_correction_stats_filename;
+    uint64_t d_correction_attempt_count;
+    uint64_t d_correction_crc_success_count;
+    std::vector<gr_complex> d_ref_ltf1;
+    std::vector<gr_complex> d_ref_ltf2;
+    std::vector<gr_complex> d_ref_wifi_rx_from_zigbee;
+    bool d_reference_ready;
 
     std::shared_ptr<gr::digital::constellation> d_frame_mod;
     constellation_bpsk::sptr d_bpsk;

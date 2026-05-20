@@ -197,13 +197,13 @@ blocks:
     start: '0'
     step: '0.01'
     stop: '1'
-    value: '1'
+    value: '0.9'
     widget: counter_slider
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1296, 24.0]
+    coordinate: [1312, 24.0]
     rotation: 0
     state: enabled
 - name: samp_rate
@@ -311,7 +311,7 @@ blocks:
     start: '0'
     step: '0.01'
     stop: '1'
-    value: '0.5'
+    value: '0.9'
     widget: counter_slider
   states:
     bus_sink: false
@@ -333,6 +333,21 @@ blocks:
     bus_source: false
     bus_structure: null
     coordinate: [128, 304.0]
+    rotation: 0
+    state: disabled
+- name: blocks_message_debug_1
+  id: blocks_message_debug
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    en_uvec: 'True'
+    log_level: info
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [616, 656.0]
     rotation: 0
     state: disabled
 - name: blocks_message_strobe_0
@@ -473,7 +488,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [840, 520.0]
+    coordinate: [952, 616.0]
     rotation: 0
     state: enabled
 - name: foo_packet_pad2_0
@@ -493,7 +508,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [512, 864.0]
+    coordinate: [584, 912.0]
     rotation: 0
     state: disabled
 - name: foo_packet_pad2_1
@@ -528,7 +543,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1280, 472.0]
+    coordinate: [1312, 480.0]
     rotation: 0
     state: enabled
 - name: pdu_add_system_time_0
@@ -544,9 +559,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [872, 256.0]
+    coordinate: [896, 256.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: pdu_pdu_to_tagged_stream_0
   id: pdu_pdu_to_tagged_stream
   parameters:
@@ -750,7 +765,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [544, 688.0]
+    coordinate: [616, 752.0]
     rotation: 0
     state: disabled
 - name: seq_input
@@ -762,7 +777,7 @@ blocks:
       in\"))\n        self.set_msg_handler(pmt.intern(\"in\"), self.handle_trigger)\n\
       \        self.message_port_register_in(pmt.intern(\"feedback\"))\n        self.set_msg_handler(pmt.intern(\"\
       feedback\"), self.handle_feedback)\n        self.message_port_register_out(pmt.intern(\"\
-      out\"))\n\n        self.max_seq = 1000\n        self.seq = 0\n        self.current_payload\
+      out\"))\n\n        self.max_seq = 10000\n        self.seq = 0\n        self.current_payload\
       \ = None  # current_payload will set after first message from in port\n    \
       \    self.stopped = False\n        self.total_tx_count = 0\n        self.stats_filename\
       \ = \"seq_pdu_stats.txt\"\n\n    def handle_trigger(self, msg):\n        if\
@@ -1074,7 +1089,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [928, 860.0]
+    coordinate: [656, 700.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_sink_0_0
@@ -1351,7 +1366,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1672, 484.0]
+    coordinate: [1664, 484.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_source_0
@@ -2243,7 +2258,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [632, 496.0]
+    coordinate: [680, 456.0]
     rotation: 180
     state: enabled
 
@@ -2261,6 +2276,8 @@ connections:
 - [pdu_add_system_time_0, pdu, digital_crc16_async_bb_0, in]
 - [pdu_add_system_time_0, pdu, digital_crc32_async_bb_0, in]
 - [pdu_pdu_to_tagged_stream_0, '0', qtgui_const_sink_x_0, '0']
+- [seq_input, out, digital_crc16_async_bb_0, in]
+- [seq_input, out, digital_crc32_async_bb_0, in]
 - [seq_input, out, pdu_add_system_time_0, pdu]
 - [uhd_usrp_source_0, '0', wifi_phy_hier_0, '0']
 - [uhd_usrp_source_0_0, '0', ieee802_15_4_oqpsk_phy_0, '0']
@@ -2270,6 +2287,7 @@ connections:
 - [wifi_phy_hier_0, carrier, pdu_pdu_to_tagged_stream_0, pdus]
 - [wifi_phy_hier_0, mac_out, blocks_message_debug_0, print]
 - [wifi_phy_hier_0, mac_out, convert_ascii_0, in]
+- [wifi_phy_hier_0, tx_feedback, blocks_message_debug_1, print]
 - [wifi_phy_hier_0, tx_feedback, seq_input, feedback]
 
 metadata:

@@ -74,10 +74,13 @@ def main():
     print(f"Input: {args.in_path} (len={len(x)})")
     print(f"LTF1 useful window: [{start1}, {start1 + args.nfft - 1}]")
     print(f"LTF2 useful window: [{start2}, {start2 + args.nfft - 1}]")
-    print(f"Saved: {args.out1_npy}, {args.out2_npy}")
+    print(f"Saved: {args.out1_npy}, {args.owifiut2_npy}")
     print(f"Saved: {args.out1_csv}, {args.out2_csv}")
     print("Index note: if useful start is 176 (0-based), index 175 is last CP sample.")
 
 
 if __name__ == "__main__":
     main()
+
+
+# python3 extract_two_ltf_ffts.py --in wifi_rx_from_zigbee.npy --start1 176 --nfft 64 --shift

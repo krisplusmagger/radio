@@ -22,8 +22,12 @@
 #include "equalizer/sta.h"
 #include "frame_equalizer_impl.h"
 #include "utils.h"
+#include <algorithm>
 #include <boost/crc.hpp>
+#include <fstream>
 #include <gnuradio/io_signature.h>
+#include <memory>
+#include <sstream>
 
 namespace gr {
 namespace ieee802_11 {
@@ -45,6 +49,7 @@ frame_equalizer_impl::frame_equalizer_impl(
       d_log(log),
       d_debug(debug),
       d_equalizer(NULL),
+      d_algorithm(algo),
       d_freq(freq),
       d_bw(bw),
       d_frame_bytes(0),
@@ -52,7 +57,16 @@ frame_equalizer_impl::frame_equalizer_impl(
       d_ofdm(BPSK_1_2),
       d_frame(d_ofdm, 0),
       d_freq_offset_from_synclong(0.0),
-      d_signal_symbols_pending(false)
+      d_signal_symbols_pending(false),
+      d_signal_valid(false),
+      d_captured_symbol_count(0),
+      d_pending_output_items(0),
+      d_pending_output_offset(0),
+      d_pending_meta(pmt::make_dict()),
+      d_correction_stats_filename("zigbee_correction_stats.txt"),
+      d_correction_attempt_count(0),
+      d_correction_crc_success_count(0),
+      d_reference_ready(false)
 {
 
 
@@ -73,6 +87,9 @@ frame_equalizer_impl::frame_equalizer_impl(
     d_frame_mod = d_bpsk;
 
     set_tag_propagation_policy(block::TPP_DONT);
+    d_reference_ready = load_reference_data();
+    reset_frame_capture();
+    write_correction_stats();
     set_algorithm(algo);
 }
 
@@ -82,29 +99,9 @@ frame_equalizer_impl::~frame_equalizer_impl() {}
 void frame_equalizer_impl::set_algorithm(Equalizer algo)
 {
     gr::thread::scoped_lock lock(d_mutex);
+    d_algorithm = algo;
     delete d_equalizer;
-
-    switch (algo) {
-
-    case COMB:
-        dout << "Comb" << std::endl;
-        d_equalizer = new equalizer::comb();
-        break;
-    case LS:
-        dout << "LS" << std::endl;
-        d_equalizer = new equalizer::ls();
-        break;
-    case LMS:
-        dout << "LMS" << std::endl;
-        d_equalizer = new equalizer::lms();
-        break;
-    case STA:
-        dout << "STA" << std::endl;
-        d_equalizer = new equalizer::sta();
-        break;
-    default:
-        throw std::runtime_error("Algorithm not implemented");
-    }
+    d_equalizer = create_equalizer(algo);
 }
 
 void frame_equalizer_impl::set_bandwidth(double bw)
@@ -136,25 +133,23 @@ int frame_equalizer_impl::general_work(int noutput_items,
     const gr_complex* in = (const gr_complex*)input_items[0];
     uint8_t* out = (uint8_t*)output_items[0];
 
-    int i = 0;
-    int o = 0;
+    if (d_pending_output_items > d_pending_output_offset) {
+        return flush_pending_output(out, noutput_items);
+    }
 
-    gr_complex symbols[48];
+    int i = 0;
     gr_complex current_symbol[64];
 
     dout << "FRAME EQUALIZER: input " << ninput_items[0] << "  output " << noutput_items
          << std::endl;
 
-    while ((i < ninput_items[0]) && (o < noutput_items)) {
+    while (i < ninput_items[0]) {
 
         get_tags_in_window(tags, 0, i, i + 1, pmt::string_to_symbol("wifi_start"));
 
         // new frame
         if (tags.size()) {
-            d_current_symbol = 0;
-            d_frame_symbols = 0;
-            d_frame_mod = d_bpsk;
-            d_signal_symbols_pending = false;
+            reset_frame_capture();
 
             d_freq_offset_from_synclong =
                 pmt::to_double(tags.front().value) * d_bw / (2 * M_PI);
@@ -222,80 +217,72 @@ int frame_equalizer_impl::general_work(int noutput_items,
             d_er = (1 - alpha) * d_er + alpha * er;
         }
 
-
- 
-
-        // do equalization
-        d_equalizer->equalize(
-            current_symbol, d_current_symbol, symbols, out + o * 48, d_frame_mod); // write the equalized bits to out
-
-        //  add anohter pointer gr_complex* out_zigbee
-        // for i=0...5, out_zigbee[i] = current_symbol[i], then remain the rest, wer got the new array filled with the data from the zigbee //
-        //and in frame_equyalizer_impl.cc we can access that array and create another output port
-        // here if i change it to 64, does that mean it will copy 64 data at one time?
-        // std::memcpy(out_zigbee + d_current_symbol * 64, current_symbol,  64 * sizeof(gr_complex));
-        // int o_zigbee = 0;
         if (d_current_symbol < 2) {
             std::memcpy(d_saved_signal_symbols + d_current_symbol * 64,
                         current_symbol,
                         64 * sizeof(gr_complex));
             d_signal_symbols_pending = true;
         }
+
+        if (d_current_symbol < MAX_SYM + 3) {
+            std::memcpy(d_captured_symbols + d_current_symbol * 64,
+                        current_symbol,
+                        64 * sizeof(gr_complex));
+            d_captured_symbol_count = std::max(d_captured_symbol_count, d_current_symbol + 1);
+        }
   
         // signal field
         if (d_current_symbol == 2) {
+            uint8_t signal_bits[48];
+            gr_complex signal_symbols[48];
+            d_equalizer->equalize(
+                current_symbol, d_current_symbol, signal_symbols, signal_bits, d_frame_mod);
 
-            if (decode_signal_field(out + o * 48)) {
+            if (decode_signal_field(signal_bits)) {
+                d_signal_valid = true;
+                d_pending_meta = pmt::make_dict();
 
-                pmt::pmt_t dict = pmt::make_dict();
-                dict = pmt::dict_add(
-                    dict, pmt::mp("frame bytes"), pmt::from_uint64(d_frame_bytes));
-                dict = pmt::dict_add(
-                    dict, pmt::mp("encoding"), pmt::from_uint64(d_frame_encoding));
-                dict = pmt::dict_add(
-                    dict, pmt::mp("snr"), pmt::from_double(d_equalizer->get_snr()));
-                dict = pmt::dict_add(
-                    dict, pmt::mp("nominal frequency"), pmt::from_double(d_freq));
-                dict = pmt::dict_add(dict,
-                                     pmt::mp("frequency offset"),
-                                     pmt::from_double(d_freq_offset_from_synclong));
-                dict = pmt::dict_add(dict, pmt::mp("beta"), pmt::from_double(beta));
+                d_pending_meta = pmt::dict_add(
+                    d_pending_meta, pmt::mp("frame bytes"), pmt::from_uint64(d_frame_bytes));
+                d_pending_meta = pmt::dict_add(
+                    d_pending_meta, pmt::mp("encoding"), pmt::from_uint64(d_frame_encoding));
+                d_pending_meta = pmt::dict_add(
+                    d_pending_meta, pmt::mp("snr"), pmt::from_double(d_equalizer->get_snr()));
+                d_pending_meta = pmt::dict_add(
+                    d_pending_meta, pmt::mp("nominal frequency"), pmt::from_double(d_freq));
+                d_pending_meta = pmt::dict_add(d_pending_meta,
+                                               pmt::mp("frequency offset"),
+                                               pmt::from_double(d_freq_offset_from_synclong));
+                d_pending_meta =
+                    pmt::dict_add(d_pending_meta, pmt::mp("beta"), pmt::from_double(beta));
 
                 std::vector<gr_complex> csi = d_equalizer->get_csi();
-                dict = pmt::dict_add(
-                    dict, pmt::mp("csi"), pmt::init_c32vector(csi.size(), csi));
-
-                pmt::pmt_t pairs = pmt::dict_items(dict);
-                for (int i = 0; i < pmt::length(pairs); i++) {
-                    pmt::pmt_t pair = pmt::nth(i, pairs);
-                    add_item_tag(0,
-                                 nitems_written(0) + o,
-                                 pmt::car(pair),
-                                 pmt::cdr(pair),
-                                 alias_pmt());
-                }
+                d_pending_meta = pmt::dict_add(
+                    d_pending_meta, pmt::mp("csi"), pmt::init_c32vector(csi.size(), csi));
             } else if (d_signal_symbols_pending) {
                 message_port_pub(pmt::mp("tx_feedback"), pmt::intern("nack"));
                 d_signal_symbols_pending = false;
             }
         }
 
-        if (d_current_symbol > 2) {
-            std::memcpy(d_rx_symbols + (d_current_symbol - 3) * 48, out + o * 48, 48);
+        if (d_signal_valid && d_current_symbol == d_frame_symbols + 2) {
+            std::vector<gr_complex> final_symbols;
+            uint8_t final_bits[48 * MAX_SYM];
+            bool salvaged = false;
 
-            if (d_current_symbol == d_frame_symbols + 2) {
-                if (decode_payload()) {
-                    write_signal_symbols();
-                } else {
-                    d_signal_symbols_pending = false;
-                }
+            if (try_decode_with_salvage(final_bits, final_symbols, salvaged)) {
+                std::memcpy(d_pending_output_bits, final_bits, d_frame.n_sym * 48);
+                d_pending_payload_symbols = final_symbols;
+                d_pending_output_items = d_frame.n_sym;
+                d_pending_output_offset = 0;
+                publish_payload_symbols(final_symbols);
+                write_signal_symbols();
+            } else {
+                d_signal_symbols_pending = false;
             }
-
-            o++;
-            pmt::pmt_t pdu = pmt::make_dict();
-            message_port_pub(
-                pmt::mp("symbols"),
-                pmt::cons(pmt::make_dict(), pmt::init_c32vector(48, symbols)));
+            i++;
+            d_current_symbol++;
+            break;
         }
 
         i++;
@@ -303,7 +290,286 @@ int frame_equalizer_impl::general_work(int noutput_items,
     }
 
     consume(0, i);
-    return o;
+    if (d_pending_output_items > d_pending_output_offset) {
+        return flush_pending_output(out, noutput_items);
+    }
+    return 0;
+}
+
+equalizer::base* frame_equalizer_impl::create_equalizer(Equalizer algo) const
+{
+    switch (algo) {
+    case COMB:
+        return new equalizer::comb();
+    case LS:
+        return new equalizer::ls();
+    case LMS:
+        return new equalizer::lms();
+    case STA:
+        return new equalizer::sta();
+    default:
+        throw std::runtime_error("Algorithm not implemented");
+    }
+}
+
+bool frame_equalizer_impl::load_complex_csv_skip_header(const std::string& path,
+                                                        int real_col,
+                                                        int imag_col,
+                                                        std::vector<gr_complex>& out)
+{
+    std::ifstream in(path);
+    if (!in.is_open()) {
+        return false;
+    }
+
+    out.clear();
+    std::string line;
+    bool first = true;
+    while (std::getline(in, line)) {
+        if (line.empty()) {
+            continue;
+        }
+        if (first) {
+            first = false;
+            continue;
+        }
+
+        std::stringstream ss(line);
+        std::string item;
+        std::vector<std::string> cols;
+        while (std::getline(ss, item, ',')) {
+            cols.push_back(item);
+        }
+        if ((int)cols.size() <= std::max(real_col, imag_col)) {
+            continue;
+        }
+        out.emplace_back(std::stof(cols[real_col]), std::stof(cols[imag_col]));
+    }
+    return !out.empty();
+}
+
+
+bool frame_equalizer_impl::load_reference_data()
+{
+    const std::string base = "/home/kk/gnuradio/gr-ieee802-11/examples/ofdm_zigbee/";
+    return load_complex_csv_skip_header(base + "ltf_fft1.csv", 1, 2, d_ref_ltf1) &&
+           load_complex_csv_skip_header(base + "ltf_fft2.csv", 1, 2, d_ref_ltf2) &&
+           load_complex_csv_skip_header(base + "wifi_rx_from_zigbee.csv",
+                                        0,
+                                        1,
+                                        d_ref_wifi_rx_from_zigbee);
+}
+
+void frame_equalizer_impl::reset_frame_capture()
+{
+    d_current_symbol = 0;
+    d_frame_bytes = 0;
+    d_frame_symbols = 0;
+    d_frame_encoding = 0;
+    d_frame_mod = d_bpsk;
+    d_signal_symbols_pending = false;
+    d_signal_valid = false;
+    d_captured_symbol_count = 0;
+    d_pending_meta = pmt::make_dict();
+}
+
+bool frame_equalizer_impl::run_equalizer_attempt(gr_complex* frame_symbols,
+                                                 uint8_t* out_bits,
+                                                 std::vector<gr_complex>& out_symbols)
+{
+    std::unique_ptr<equalizer::base> eq(create_equalizer(d_algorithm));
+    uint8_t scratch_bits[48];
+    gr_complex scratch_symbols[48];
+
+    eq->equalize(frame_symbols, 0, scratch_symbols, scratch_bits, d_bpsk);
+    eq->equalize(frame_symbols + 64, 1, scratch_symbols, scratch_bits, d_bpsk);
+
+    out_symbols.clear();
+    out_symbols.reserve(d_frame.n_sym * 48);
+
+    for (int sym = 0; sym < d_frame.n_sym; sym++) {
+        eq->equalize(frame_symbols + (sym + 3) * 64,
+                     sym + 3,
+                     scratch_symbols,
+                     out_bits + sym * 48,
+                     d_frame_mod);
+        for (int k = 0; k < 48; k++) {
+            out_symbols.push_back(scratch_symbols[k]);
+        }
+    }
+
+    return true;
+}
+
+gr_complex frame_equalizer_impl::estimate_zigbee_channel() const
+{
+    if (!d_reference_ready || d_ref_ltf1.size() < 64 || d_ref_ltf2.size() < 64 ||
+        d_captured_symbol_count < 2) {
+        return gr_complex(0, 0);
+    }
+
+    const int dc_bin = 32;
+    gr_complex h_sum(0, 0);
+    int count = 0;
+
+    if (std::abs(d_ref_ltf1[dc_bin]) > 1e-6f) {
+        h_sum += d_captured_symbols[dc_bin] / d_ref_ltf1[dc_bin];
+        count++;
+    }
+    // if (std::abs(d_ref_ltf2[dc_bin]) > 1e-6f) {
+    //     h_sum += d_captured_symbols[64 + dc_bin] / d_ref_ltf2[dc_bin];
+    //     count++;
+    // }
+
+    if (count == 0) {
+        return gr_complex(0, 0);
+    }
+    return h_sum / gr_complex(count, 0);
+}
+
+bool frame_equalizer_impl::get_zigbee_reference_symbol_fft(int symbol_idx,
+                                                           gr_complex* fft_symbol) const
+{
+    if (!d_reference_ready) {
+        return false;
+    }
+
+    const int ltf_start = 176;
+    const int nfft = 64;
+    const int start = ltf_start + symbol_idx * nfft;
+    if (start < 0 || start + nfft > (int)d_ref_wifi_rx_from_zigbee.size()) {
+        return false;
+    }
+
+    for (int k = 0; k < nfft; k++) {
+        fft_symbol[k] = gr_complex(0, 0);
+    }
+
+    for (int bin = 0; bin < nfft; bin++) {
+        gr_complex acc(0, 0);
+        for (int n = 0; n < nfft; n++) {
+            const float angle = -2 * M_PI * bin * n / nfft;
+            acc += d_ref_wifi_rx_from_zigbee[start + n] * exp(gr_complex(0, angle));
+        }
+        fft_symbol[bin] = acc;
+    }
+    return true;
+}
+
+void frame_equalizer_impl::subtract_zigbee_interference(gr_complex h,
+                                                        gr_complex* frame_symbols,
+                                                        int total_symbols) const
+{
+    if (std::abs(h) < 1e-9f) {
+        return;
+    }
+
+    gr_complex ref_fft[64];
+    for (int sym = 0; sym < total_symbols; sym++) {
+        if (!get_zigbee_reference_symbol_fft(sym, ref_fft)) {
+            break;
+        }
+        for (int k = 0; k < 64; k++) {
+            frame_symbols[sym * 64 + k] -= h * ref_fft[k];
+        }
+    }
+}
+
+bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
+                                                   std::vector<gr_complex>& final_symbols,
+                                                   bool& salvaged)
+{
+    uint8_t attempt_bits[48 * MAX_SYM];
+    salvaged = false;
+
+    run_equalizer_attempt(d_captured_symbols, attempt_bits, final_symbols);
+    if (decode_payload(attempt_bits, false)) {
+        std::memcpy(final_bits, attempt_bits, d_frame.n_sym * 48);
+        message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
+        return true;
+    }
+
+    std::vector<gr_complex> salvaged_symbols;
+    gr_complex salvaged_frame[(MAX_SYM + 3) * 64];
+    d_correction_attempt_count++;
+    write_correction_stats();
+    std::memcpy(salvaged_frame,
+                d_captured_symbols,
+                d_captured_symbol_count * 64 * sizeof(gr_complex));
+    subtract_zigbee_interference(
+        estimate_zigbee_channel(), salvaged_frame, d_frame.n_sym + 3);
+
+    run_equalizer_attempt(salvaged_frame, attempt_bits, salvaged_symbols);
+    if (decode_payload(attempt_bits, false)) {
+        std::memcpy(final_bits, attempt_bits, d_frame.n_sym * 48);
+        final_symbols.swap(salvaged_symbols);
+        salvaged = true;
+        d_correction_crc_success_count++;
+        write_correction_stats();
+        message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
+        return true;
+    }
+
+    message_port_pub(pmt::mp("tx_feedback"), pmt::intern("nack"));
+    return false;
+}
+
+int frame_equalizer_impl::flush_pending_output(uint8_t* out, int noutput_items)
+{
+    const int available = d_pending_output_items - d_pending_output_offset;
+    const int produced = std::min(noutput_items, available);
+    if (produced <= 0) {
+        return 0;
+    }
+
+    std::memcpy(out,
+                d_pending_output_bits + d_pending_output_offset * 48,
+                produced * 48);
+
+    if (d_pending_output_offset == 0) {
+        pmt::pmt_t pairs = pmt::dict_items(d_pending_meta);
+        for (int idx = 0; idx < pmt::length(pairs); idx++) {
+            pmt::pmt_t pair = pmt::nth(idx, pairs);
+            add_item_tag(0,
+                         nitems_written(0),
+                         pmt::car(pair),
+                         pmt::cdr(pair),
+                         alias_pmt());
+        }
+    }
+
+    d_pending_output_offset += produced;
+    if (d_pending_output_offset >= d_pending_output_items) {
+        d_pending_output_items = 0;
+        d_pending_output_offset = 0;
+        d_pending_payload_symbols.clear();
+    }
+
+    return produced;
+}
+
+void frame_equalizer_impl::publish_payload_symbols(
+    const std::vector<gr_complex>& payload_symbols)
+{
+    for (int sym = 0; sym < d_frame.n_sym; sym++) {
+        std::vector<gr_complex> one_symbol(payload_symbols.begin() + sym * 48,
+                                           payload_symbols.begin() + (sym + 1) * 48);
+        message_port_pub(
+            pmt::mp("symbols"),
+            pmt::cons(pmt::make_dict(), pmt::init_c32vector(one_symbol.size(), one_symbol)));
+    }
+}
+
+void frame_equalizer_impl::write_correction_stats()
+{
+    std::ofstream stats_file(d_correction_stats_filename, std::ios::out | std::ios::trunc);
+    if (!stats_file.is_open()) {
+        return;
+    }
+
+    stats_file << "correction_attempt_count=" << d_correction_attempt_count << "\n";
+    stats_file << "correction_crc_success_count=" << d_correction_crc_success_count
+               << "\n";
 }
 
 bool frame_equalizer_impl::decode_signal_field(uint8_t* rx_bits)
@@ -475,8 +741,9 @@ void frame_equalizer_impl::descramble(uint8_t* decoded_bits)
     }
 }
 
-bool frame_equalizer_impl::decode_payload()
+bool frame_equalizer_impl::decode_payload(const uint8_t* rx_symbols, bool publish_feedback)
 {
+    std::memcpy(d_rx_symbols, rx_symbols, d_frame.n_sym * 48);
     deinterleave();
     uint8_t* decoded = d_decoder.decode(&d_ofdm, &d_frame, d_deinterleaved_bits);
     descramble(decoded);
@@ -486,11 +753,15 @@ bool frame_equalizer_impl::decode_payload()
 
     if (result.checksum() != 558161692) {
         dout << "payload checksum wrong -- dropping saved signal symbols" << std::endl;
-        message_port_pub(pmt::mp("tx_feedback"), pmt::intern("nack"));
+        if (publish_feedback) {
+            message_port_pub(pmt::mp("tx_feedback"), pmt::intern("nack"));
+        }
         return false;
     }
 
-    message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
+    if (publish_feedback) {
+        message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
+    }
     return true;
 }
 
