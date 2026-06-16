@@ -544,7 +544,7 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
     std::vector<gr_complex> salvaged_symbols;
     gr_complex salvaged_frame[(MAX_SYM + 3) * 64];
     const int default_ltf_start_raw = 176;
-    const int search_radius = 144;
+    const int search_radius = 170;
     double best_failed_score = -1.0;
     int best_failed_ltf_start_raw = default_ltf_start_raw;
     d_correction_attempt_count++;
