@@ -316,40 +316,6 @@ blocks:
     coordinate: [688, 12.0]
     rotation: 0
     state: enabled
-- name: customModule_getSignal_0
-  id: customModule_getSignal
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: ''
-    length: '1'
-    signal_filename: '"wifi_raw.txt"'
-    start_index_filename: '"start_wifi_short.txt"'
-    type: complex
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [736, 792.0]
-    rotation: 0
-    state: enabled
-- name: customModule_getSignal_0_0
-  id: customModule_getSignal
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: ''
-    length: '1'
-    signal_filename: '"wifi_raw_2.txt"'
-    start_index_filename: '"start_wifi_long.txt"'
-    type: complex
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [1080, 944.0]
-    rotation: 0
-    state: enabled
 - name: digital_chunks_to_symbols_xx_0
   id: digital_chunks_to_symbols_xx
   parameters:
@@ -532,7 +498,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1104, 1080.0]
+    coordinate: [1168, 1088.0]
     rotation: 180
     state: enabled
 - name: frequency
@@ -655,7 +621,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [480, 1192.0]
+    coordinate: [464, 1200.0]
     rotation: 180
     state: enabled
 - name: pad_sink_2
@@ -691,7 +657,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [480, 1288.0]
+    coordinate: [432, 1280.0]
     rotation: 180
     state: enabled
 - name: pad_source_0
@@ -821,9 +787,7 @@ connections:
 - [pad_source_0, '0', blocks_multiply_xx_0, '0']
 - [pad_source_1, out, ieee802_11_mapper_0, in]
 - [sync_long, '0', blocks_stream_to_vector_0, '0']
-- [sync_long, '0', customModule_getSignal_0_0, '0']
 - [sync_short, '0', blocks_delay_0, '0']
-- [sync_short, '0', customModule_getSignal_0, '0']
 - [sync_short, '0', sync_long, '0']
 
 metadata:

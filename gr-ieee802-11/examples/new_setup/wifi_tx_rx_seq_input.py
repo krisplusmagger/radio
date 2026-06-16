@@ -13,7 +13,7 @@ class blk(gr.basic_block):
         self.set_msg_handler(pmt.intern("feedback"), self.handle_feedback)
         self.message_port_register_out(pmt.intern("out"))
 
-        self.max_seq = 10000
+        self.max_seq = 1000000
         self.seq = 0
         self.current_payload = None  # current_payload will set after first message from in port
         self.stopped = False
