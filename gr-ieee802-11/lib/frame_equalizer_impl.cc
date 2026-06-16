@@ -66,6 +66,8 @@ frame_equalizer_impl::frame_equalizer_impl(
       d_correction_stats_filename("zigbee_correction_stats.txt"),
       d_correction_attempt_count(0),
       d_correction_crc_success_count(0),
+      d_last_correlation_score(0.0),
+      d_last_zigbee_ltf_start_raw(176),
       d_reference_ready(false)
 {
 
@@ -371,6 +373,8 @@ void frame_equalizer_impl::reset_frame_capture()
     d_signal_valid = false;
     d_captured_symbol_count = 0;
     d_pending_meta = pmt::make_dict();
+    d_last_correlation_score = 0.0;
+    d_last_zigbee_ltf_start_raw = 176;
 }
 
 bool frame_equalizer_impl::run_equalizer_attempt(gr_complex* frame_symbols,
@@ -401,48 +405,83 @@ bool frame_equalizer_impl::run_equalizer_attempt(gr_complex* frame_symbols,
     return true;
 }
 
-gr_complex frame_equalizer_impl::estimate_zigbee_channel() const
+int frame_equalizer_impl::raw_fft_start_from_symbol_idx(int ltf_start_raw,
+                                                        int symbol_idx) const
 {
-    if (!d_reference_ready || d_ref_ltf1.size() < 64 || d_ref_ltf2.size() < 64 ||
-        d_captured_symbol_count < 2) {
-        return gr_complex(0, 0);
+    if (symbol_idx < 2) {
+        return ltf_start_raw + symbol_idx * 64;
+    }
+
+    return ltf_start_raw + 128 + 16 + (symbol_idx - 2) * 80;
+}
+
+bool frame_equalizer_impl::estimate_zigbee_channel_for_offset(int ltf_start_raw,
+                                                              gr_complex& h,
+                                                              double& score) const
+{
+    if (!d_reference_ready || d_captured_symbol_count < 2) {
+        h = gr_complex(0, 0);
+        score = 0.0;
+        return false;
     }
 
     const int dc_bin = 32;
-    gr_complex h_sum(0, 0);
-    int count = 0;
+    const double eps = 1e-12;
+    gr_complex ref_fft[64];
+    gr_complex numerator(0, 0);
+    double rx_energy = 0.0;
+    double ref_energy = 0.0;
+    int used_symbols = 0;
 
-    if (std::abs(d_ref_ltf1[dc_bin]) > 1e-6f) {
-        h_sum += d_captured_symbols[dc_bin] / d_ref_ltf1[dc_bin];
-        count++;
-    }
-    // if (std::abs(d_ref_ltf2[dc_bin]) > 1e-6f) {
-    //     h_sum += d_captured_symbols[64 + dc_bin] / d_ref_ltf2[dc_bin];
-    //     count++;
-    // }
+    for (int sym = 0; sym < 2; sym++) {
+        if (!get_zigbee_reference_symbol_fft(sym, ltf_start_raw, ref_fft)) {
+            continue;
+        }
 
-    if (count == 0) {
-        return gr_complex(0, 0);
+        const gr_complex y_dc = d_captured_symbols[sym * 64 + dc_bin];
+        const gr_complex z_dc = ref_fft[dc_bin];
+        numerator += y_dc * conj(z_dc);
+        rx_energy += std::norm(y_dc);
+        ref_energy += std::norm(z_dc);
+        used_symbols++;
     }
-    return h_sum / gr_complex(count, 0);
+
+    if (used_symbols == 0 || rx_energy <= eps || ref_energy <= eps) {
+        h = gr_complex(0, 0);
+        score = 0.0;
+        return false;
+    }
+
+    h = numerator / static_cast<float>(ref_energy + eps);
+    score = std::abs(numerator) / std::sqrt(rx_energy * ref_energy);
+    return true;
 }
 
 bool frame_equalizer_impl::get_zigbee_reference_symbol_fft(int symbol_idx,
+                                                           gr_complex* fft_symbol) const
+{
+    const int ltf_start_raw = 176;
+    return get_zigbee_reference_symbol_fft(symbol_idx, ltf_start_raw, fft_symbol);
+}
+
+bool frame_equalizer_impl::get_zigbee_reference_symbol_fft(int symbol_idx,
+                                                           int ltf_start_raw,
                                                            gr_complex* fft_symbol) const
 {
     if (!d_reference_ready) {
         return false;
     }
 
-    const int ltf_start = 176;
     const int nfft = 64;
-    const int start = ltf_start + symbol_idx * nfft;
+    const int start = raw_fft_start_from_symbol_idx(ltf_start_raw, symbol_idx);
     if (start < 0 || start + nfft > (int)d_ref_wifi_rx_from_zigbee.size()) {
         return false;
     }
 
+    gr_complex unshifted_fft[64];
     for (int k = 0; k < nfft; k++) {
         fft_symbol[k] = gr_complex(0, 0);
+        unshifted_fft[k] = gr_complex(0, 0);
     }
 
     for (int bin = 0; bin < nfft; bin++) {
@@ -451,12 +490,25 @@ bool frame_equalizer_impl::get_zigbee_reference_symbol_fft(int symbol_idx,
             const float angle = -2 * M_PI * bin * n / nfft;
             acc += d_ref_wifi_rx_from_zigbee[start + n] * exp(gr_complex(0, angle));
         }
-        fft_symbol[bin] = acc;
+        unshifted_fft[bin] = acc;
+    }
+
+    for (int bin = 0; bin < nfft; bin++) {
+        fft_symbol[bin] = unshifted_fft[(bin + nfft / 2) % nfft];
     }
     return true;
 }
 
 void frame_equalizer_impl::subtract_zigbee_interference(gr_complex h,
+                                                        gr_complex* frame_symbols,
+                                                        int total_symbols) const
+{
+    const int ltf_start_raw = 176;
+    subtract_zigbee_interference(h, ltf_start_raw, frame_symbols, total_symbols);
+}
+
+void frame_equalizer_impl::subtract_zigbee_interference(gr_complex h,
+                                                        int ltf_start_raw,
                                                         gr_complex* frame_symbols,
                                                         int total_symbols) const
 {
@@ -466,7 +518,7 @@ void frame_equalizer_impl::subtract_zigbee_interference(gr_complex h,
 
     gr_complex ref_fft[64];
     for (int sym = 0; sym < total_symbols; sym++) {
-        if (!get_zigbee_reference_symbol_fft(sym, ref_fft)) {
+        if (!get_zigbee_reference_symbol_fft(sym, ltf_start_raw, ref_fft)) {
             break;
         }
         for (int k = 0; k < 64; k++) {
@@ -491,23 +543,53 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
 
     std::vector<gr_complex> salvaged_symbols;
     gr_complex salvaged_frame[(MAX_SYM + 3) * 64];
+    const int default_ltf_start_raw = 176;
+    const int search_radius = 144;
+    double best_failed_score = -1.0;
+    int best_failed_ltf_start_raw = default_ltf_start_raw;
     d_correction_attempt_count++;
     write_correction_stats();
-    std::memcpy(salvaged_frame,
-                d_captured_symbols,
-                d_captured_symbol_count * 64 * sizeof(gr_complex));
-    subtract_zigbee_interference(
-        estimate_zigbee_channel(), salvaged_frame, d_frame.n_sym + 3);
 
-    run_equalizer_attempt(salvaged_frame, attempt_bits, salvaged_symbols);
-    if (decode_payload(attempt_bits, false)) {
-        std::memcpy(final_bits, attempt_bits, d_frame.n_sym * 48);
-        final_symbols.swap(salvaged_symbols);
-        salvaged = true;
-        d_correction_crc_success_count++;
+    for (int candidate = default_ltf_start_raw - search_radius;
+         candidate <= default_ltf_start_raw + search_radius;
+         candidate++) {
+        gr_complex zigbee_h(0, 0);
+        double zigbee_score = 0.0;
+        if (!estimate_zigbee_channel_for_offset(candidate, zigbee_h, zigbee_score)) {
+            continue;
+        }
+
+        if (zigbee_score > best_failed_score) {
+            best_failed_score = zigbee_score;
+            best_failed_ltf_start_raw = candidate;
+        }
+
+        d_last_zigbee_ltf_start_raw = candidate;
+        d_last_correlation_score = zigbee_score;
+
+        std::memcpy(salvaged_frame,
+                    d_captured_symbols,
+                    d_captured_symbol_count * 64 * sizeof(gr_complex));
+        subtract_zigbee_interference(
+            zigbee_h, candidate, salvaged_frame, d_frame.n_sym + 3);
+
+        salvaged_symbols.clear();
+        run_equalizer_attempt(salvaged_frame, attempt_bits, salvaged_symbols);
+        if (decode_payload(attempt_bits, false)) {
+            std::memcpy(final_bits, attempt_bits, d_frame.n_sym * 48);
+            final_symbols.swap(salvaged_symbols);
+            salvaged = true;
+            d_correction_crc_success_count++;
+            write_correction_stats();
+            message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
+            return true;
+        }
+    }
+
+    if (best_failed_score >= 0.0) {
+        d_last_zigbee_ltf_start_raw = best_failed_ltf_start_raw;
+        d_last_correlation_score = best_failed_score;
         write_correction_stats();
-        message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
-        return true;
     }
 
     message_port_pub(pmt::mp("tx_feedback"), pmt::intern("nack"));
@@ -570,6 +652,8 @@ void frame_equalizer_impl::write_correction_stats()
     stats_file << "correction_attempt_count=" << d_correction_attempt_count << "\n";
     stats_file << "correction_crc_success_count=" << d_correction_crc_success_count
                << "\n";
+    stats_file << "last_correlation_score=" << d_last_correlation_score << "\n";
+    stats_file << "last_ltf_start_raw=" << d_last_zigbee_ltf_start_raw << "\n";
 }
 
 bool frame_equalizer_impl::decode_signal_field(uint8_t* rx_bits)

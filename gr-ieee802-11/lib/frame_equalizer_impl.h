@@ -64,9 +64,19 @@ private:
     bool run_equalizer_attempt(gr_complex* frame_symbols,
                                uint8_t* out_bits,
                                std::vector<gr_complex>& out_symbols);
-    gr_complex estimate_zigbee_channel() const;
+    int raw_fft_start_from_symbol_idx(int ltf_start_raw, int symbol_idx) const;
+    bool estimate_zigbee_channel_for_offset(int ltf_start_raw,
+                                            gr_complex& h,
+                                            double& score) const;
     bool get_zigbee_reference_symbol_fft(int symbol_idx, gr_complex* fft_symbol) const;
+    bool get_zigbee_reference_symbol_fft(int symbol_idx,
+                                         int ltf_start_raw,
+                                         gr_complex* fft_symbol) const;
     void subtract_zigbee_interference(gr_complex h,
+                                      gr_complex* frame_symbols,
+                                      int total_symbols) const;
+    void subtract_zigbee_interference(gr_complex h,
+                                      int ltf_start_raw,
                                       gr_complex* frame_symbols,
                                       int total_symbols) const;
     bool try_decode_with_salvage(uint8_t* final_bits,
@@ -119,6 +129,8 @@ private:
     std::string d_correction_stats_filename;
     uint64_t d_correction_attempt_count;
     uint64_t d_correction_crc_success_count;
+    double d_last_correlation_score;
+    int d_last_zigbee_ltf_start_raw;
     std::vector<gr_complex> d_ref_ltf1;
     std::vector<gr_complex> d_ref_ltf2;
     std::vector<gr_complex> d_ref_wifi_rx_from_zigbee;
