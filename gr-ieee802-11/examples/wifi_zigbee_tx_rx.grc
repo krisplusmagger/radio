@@ -359,7 +359,7 @@ blocks:
     maxoutbuf: '0'
     minoutbuf: '0'
     msg: pmt.intern("TEST")
-    period: '50'
+    period: '100'
   states:
     bus_sink: false
     bus_source: false
@@ -470,7 +470,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1440, 856.0]
+    coordinate: [1208, 1096.0]
     rotation: 0
     state: enabled
 - name: digital_crc32_async_bb_0
@@ -528,7 +528,7 @@ blocks:
     bus_structure: null
     coordinate: [1320, 448.0]
     rotation: 180
-    state: enabled
+    state: disabled
 - name: ieee802_15_4_oqpsk_phy_0
   id: ieee802_15_4_oqpsk_phy
   parameters:
@@ -541,7 +541,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1104, 776.0]
+    coordinate: [1328, 696.0]
     rotation: 0
     state: enabled
 - name: pdu_add_system_time_0
@@ -775,46 +775,27 @@ blocks:
       in\"))\n        self.set_msg_handler(pmt.intern(\"in\"), self.handle_trigger)\n\
       \        self.message_port_register_in(pmt.intern(\"feedback\"))\n        self.set_msg_handler(pmt.intern(\"\
       feedback\"), self.handle_feedback)\n        self.message_port_register_out(pmt.intern(\"\
-      out\"))\n\n        self.max_seq = 10000\n        self.seq = 0\n        self.current_payload\
-      \ = None\n        self.stopped = False\n        self.total_tx_count = 0\n  \
-      \      self.ack_count = 0\n        self.acked_payload_bytes = 0\n        self.start_time\
-      \ = None\n        self.end_time = None\n        self.stats_filename = \"seq_pdu_stats.txt\"\
-      \n\n    def handle_trigger(self, msg):\n        if self.stopped:\n         \
-      \   return\n\n        if self.current_payload is None:\n            self.seq\
-      \ += 1\n            self.current_payload = self.build_payload(self.seq)\n\n\
-      \        self.publish_current_payload()\n\n    def handle_feedback(self, msg):\n\
-      \        if self.current_payload is None or not pmt.is_symbol(msg):\n      \
-      \      return\n\n        feedback = pmt.symbol_to_string(msg)\n        if feedback.startswith(\"\
-      ack:\"):\n            try:\n                ack_seq = int(feedback[4:])\n  \
-      \          except ValueError:\n                return\n\n            if ack_seq\
-      \ != self.seq:\n                return\n\n            self.ack_count += 1\n\
-      \            self.acked_payload_bytes += len(self.current_payload)\n       \
-      \     if self.seq >= self.max_seq:\n                self.end_time = time.monotonic()\n\
-      \                self.current_payload = None\n                self.stopped =\
-      \ True\n                self.write_stats()\n                return\n\n     \
-      \       self.seq += 1\n            self.current_payload = self.build_payload(self.seq)\n\
-      \            self.publish_current_payload()\n        elif feedback == \"ack\"\
-      :\n            return\n        elif feedback == \"nack\":\n            return\n\
-      \n    def build_payload(self, seq):\n        return f\"{seq:06d} HELLO WORLD\"\
-      .encode()\n\n    def publish_current_payload(self):\n        if self.start_time\
+      out\"))\n\n        self.fixed_payload = b\"000001 HELLO WORLD\"\n        self.total_tx_count\
+      \ = 0\n        self.tx_payload_bytes = 0\n        self.start_time = None\n \
+      \       self.stats_filename = \"seq_pdu_stats.txt\"\n\n    def handle_trigger(self,\
+      \ msg):\n        self.publish_payload()\n\n    def handle_feedback(self, msg):\n\
+      \        # ACK/NACK feedback is intentionally ignored for fixed-payload experiments.\n\
+      \        return\n\n    def publish_payload(self):\n        if self.start_time\
       \ is None:\n            self.start_time = time.monotonic()\n\n        payload\
-      \ = pmt.init_u8vector(len(self.current_payload), list(self.current_payload))\n\
-      \        pdu = pmt.cons(pmt.make_dict(), payload)\n        self.message_port_pub(pmt.intern(\"\
-      out\"), pdu)\n        self.total_tx_count += 1\n        self.write_stats()\n\
-      \n    def write_stats(self):\n        now = self.end_time if self.end_time is\
-      \ not None else time.monotonic()\n        elapsed_seconds = 0.0 if self.start_time\
-      \ is None else now - self.start_time\n        throughput_bps = (\n         \
-      \   self.acked_payload_bytes * 8 / elapsed_seconds\n            if elapsed_seconds\
+      \ = pmt.init_u8vector(len(self.fixed_payload), list(self.fixed_payload))\n \
+      \       pdu = pmt.cons(pmt.make_dict(), payload)\n        self.message_port_pub(pmt.intern(\"\
+      out\"), pdu)\n        self.total_tx_count += 1\n        self.tx_payload_bytes\
+      \ += len(self.fixed_payload)\n        self.write_stats()\n\n    def write_stats(self):\n\
+      \        now = time.monotonic()\n        elapsed_seconds = 0.0 if self.start_time\
+      \ is None else now - self.start_time\n        tx_throughput_bps = (\n      \
+      \      self.tx_payload_bytes * 8 / elapsed_seconds\n            if elapsed_seconds\
       \ > 0\n            else 0.0\n        )\n\n        with open(self.stats_filename,\
-      \ \"w\", encoding=\"ascii\") as stats_file:\n            stats_file.write(f\"\
-      current_seq={self.seq:06d}\\n\")\n            stats_file.write(f\"max_seq={self.max_seq:06d}\\\
-      n\")\n            stats_file.write(f\"stopped={int(self.stopped)}\\n\")\n  \
-      \          stats_file.write(f\"total_tx_count={self.total_tx_count}\\n\")\n\
-      \            stats_file.write(f\"ack_count={self.ack_count}\\n\")\n        \
-      \    stats_file.write(f\"acked_payload_bytes={self.acked_payload_bytes}\\n\"\
-      )\n            stats_file.write(f\"elapsed_seconds={elapsed_seconds:.6f}\\n\"\
-      )\n            stats_file.write(f\"throughput_bps={throughput_bps:.3f}\\n\"\
-      )\n"
+      \ \"w\", encoding=\"ascii\") as stats_file:\n            stats_file.write(\"\
+      fixed_payload=000001 HELLO WORLD\\n\")\n            stats_file.write(f\"total_tx_count={self.total_tx_count}\\\
+      n\")\n            stats_file.write(f\"tx_payload_bytes={self.tx_payload_bytes}\\\
+      n\")\n            stats_file.write(f\"elapsed_seconds={elapsed_seconds:.6f}\\\
+      n\")\n            stats_file.write(f\"tx_throughput_bps={tx_throughput_bps:.3f}\\\
+      n\")\n"
     affinity: ''
     alias: ''
     comment: ''
@@ -1380,7 +1361,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1492.0, 320]
+    coordinate: [1492.0, 256]
     rotation: 90
     state: enabled
 - name: uhd_usrp_source_0
@@ -2272,20 +2253,20 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [792, 448.0]
+    coordinate: [856, 464.0]
     rotation: 180
     state: enabled
 
 connections:
 - [blocks_message_strobe_0, strobe, seq_input, in]
 - [blocks_multiply_const_vxx_0, '0', foo_packet_pad2_0, '0']
-- [convert_ascii_0, out, seq_input, feedback]
 - [digital_crc16_async_bb_0, out, ieee802_15_4_oqpsk_phy_0, txin]
 - [digital_crc16_async_bb_1, out, convert_ascii, in]
 - [digital_crc32_async_bb_0, out, wifi_phy_hier_0, mac_in]
 - [foo_packet_pad2_0, '0', wifi_phy_hier_0, '0']
 - [foo_packet_pad2_1, '0', uhd_usrp_sink_0_0, '0']
 - [ieee802_15_4_oqpsk_phy_0, '0', foo_packet_pad2_1, '0']
+- [ieee802_15_4_oqpsk_phy_0, '0', uhd_usrp_sink_0_0, '0']
 - [ieee802_15_4_oqpsk_phy_0, rxout, digital_crc16_async_bb_1, in]
 - [pdu_add_system_time_0, pdu, digital_crc16_async_bb_0, in]
 - [pdu_add_system_time_0, pdu, digital_crc32_async_bb_0, in]

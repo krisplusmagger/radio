@@ -545,10 +545,19 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
     gr_complex salvaged_frame[(MAX_SYM + 3) * 64];
     const int default_ltf_start_raw = 176;
     const int search_radius = 170;
+    const int max_salvage_decode_attempts = 12;
     double best_failed_score = -1.0;
     int best_failed_ltf_start_raw = default_ltf_start_raw;
     d_correction_attempt_count++;
     write_correction_stats();
+
+    struct ZigbeeCandidate {
+        int ltf_start_raw;
+        gr_complex h;
+        double score;
+    };
+    std::vector<ZigbeeCandidate> candidates;
+    candidates.reserve(2 * search_radius + 1);
 
     for (int candidate = default_ltf_start_raw - search_radius;
          candidate <= default_ltf_start_raw + search_radius;
@@ -564,14 +573,29 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
             best_failed_ltf_start_raw = candidate;
         }
 
-        d_last_zigbee_ltf_start_raw = candidate;
-        d_last_correlation_score = zigbee_score;
+        candidates.push_back({ candidate, zigbee_h, zigbee_score });
+    }
+
+    if (!candidates.empty()) {
+        std::sort(candidates.begin(),
+                  candidates.end(),
+                  [](const ZigbeeCandidate& a, const ZigbeeCandidate& b) {
+                      return a.score > b.score;
+                  });
+    }
+
+    const int decode_attempts =
+        std::min(max_salvage_decode_attempts, static_cast<int>(candidates.size()));
+    for (int idx = 0; idx < decode_attempts; idx++) {
+        const ZigbeeCandidate& candidate = candidates[idx];
+        d_last_zigbee_ltf_start_raw = candidate.ltf_start_raw;
+        d_last_correlation_score = candidate.score;
 
         std::memcpy(salvaged_frame,
                     d_captured_symbols,
                     d_captured_symbol_count * 64 * sizeof(gr_complex));
         subtract_zigbee_interference(
-            zigbee_h, candidate, salvaged_frame, d_frame.n_sym + 3);
+            candidate.h, candidate.ltf_start_raw, salvaged_frame, d_frame.n_sym + 3);
 
         salvaged_symbols.clear();
         run_equalizer_attempt(salvaged_frame, attempt_bits, salvaged_symbols);
