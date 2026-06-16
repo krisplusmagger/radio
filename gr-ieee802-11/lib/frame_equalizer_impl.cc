@@ -750,6 +750,12 @@ void frame_equalizer_impl::write_correction_stats()
     stats_file << "correction_attempt_count=" << d_correction_attempt_count << "\n";
     stats_file << "correction_crc_success_count=" << d_correction_crc_success_count
                << "\n";
+    const double recovery_rate =
+        d_correction_attempt_count == 0
+            ? 0.0
+            : static_cast<double>(d_correction_crc_success_count) /
+                  static_cast<double>(d_correction_attempt_count);
+    stats_file << "recovery_rate=" << recovery_rate << "\n";
     stats_file << "last_correlation_score=" << d_last_correlation_score << "\n";
     stats_file << "last_ltf_start_raw=" << d_last_zigbee_ltf_start_raw << "\n";
 }
