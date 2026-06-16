@@ -32,6 +32,13 @@
 namespace gr {
 namespace ieee802_11 {
 
+namespace {
+constexpr int ZIGBEE_DEFAULT_LTF_START_RAW = 176;
+constexpr int ZIGBEE_SEARCH_RADIUS = 144;
+constexpr int ZIGBEE_MAX_SALVAGE_DECODE_ATTEMPTS = 12;
+constexpr int ZIGBEE_NFFT = 64;
+} // namespace
+
 frame_equalizer::sptr
 frame_equalizer::make(Equalizer algo, double freq, double bw, bool log, bool debug, const std::string& signal_filename)
 {
@@ -67,7 +74,11 @@ frame_equalizer_impl::frame_equalizer_impl(
       d_correction_attempt_count(0),
       d_correction_crc_success_count(0),
       d_last_correlation_score(0.0),
-      d_last_zigbee_ltf_start_raw(176),
+      d_last_zigbee_ltf_start_raw(ZIGBEE_DEFAULT_LTF_START_RAW),
+      d_zigbee_ref_fft_cache_min_ltf_start_raw(0),
+      d_zigbee_ref_fft_cache_max_ltf_start_raw(-1),
+      d_zigbee_ref_fft_cache_symbol_count(0),
+      d_zigbee_ref_fft_cache_ready(false),
       d_reference_ready(false)
 {
 
@@ -90,6 +101,7 @@ frame_equalizer_impl::frame_equalizer_impl(
 
     set_tag_propagation_policy(block::TPP_DONT);
     d_reference_ready = load_reference_data();
+    precompute_zigbee_reference_ffts();
     reset_frame_capture();
     write_correction_stats();
     set_algorithm(algo);
@@ -362,6 +374,46 @@ bool frame_equalizer_impl::load_reference_data()
                                         d_ref_wifi_rx_from_zigbee);
 }
 
+void frame_equalizer_impl::precompute_zigbee_reference_ffts()
+{
+    d_zigbee_ref_fft_cache.clear();
+    d_zigbee_ref_fft_cache_valid.clear();
+    d_zigbee_ref_fft_cache_ready = false;
+
+    if (!d_reference_ready) {
+        return;
+    }
+
+    d_zigbee_ref_fft_cache_min_ltf_start_raw =
+        ZIGBEE_DEFAULT_LTF_START_RAW - ZIGBEE_SEARCH_RADIUS;
+    d_zigbee_ref_fft_cache_max_ltf_start_raw =
+        ZIGBEE_DEFAULT_LTF_START_RAW + ZIGBEE_SEARCH_RADIUS;
+    d_zigbee_ref_fft_cache_symbol_count = MAX_SYM + 3;
+
+    const int offset_count = d_zigbee_ref_fft_cache_max_ltf_start_raw -
+                             d_zigbee_ref_fft_cache_min_ltf_start_raw + 1;
+    const int cache_items = offset_count * d_zigbee_ref_fft_cache_symbol_count;
+    d_zigbee_ref_fft_cache.resize(cache_items);
+    d_zigbee_ref_fft_cache_valid.assign(cache_items, 0);
+
+    for (int ltf_start_raw = d_zigbee_ref_fft_cache_min_ltf_start_raw;
+         ltf_start_raw <= d_zigbee_ref_fft_cache_max_ltf_start_raw;
+         ltf_start_raw++) {
+        const int offset_idx = ltf_start_raw - d_zigbee_ref_fft_cache_min_ltf_start_raw;
+        for (int symbol_idx = 0; symbol_idx < d_zigbee_ref_fft_cache_symbol_count;
+             symbol_idx++) {
+            const int cache_idx =
+                offset_idx * d_zigbee_ref_fft_cache_symbol_count + symbol_idx;
+            if (compute_zigbee_reference_symbol_fft_uncached(
+                    symbol_idx, ltf_start_raw, d_zigbee_ref_fft_cache[cache_idx])) {
+                d_zigbee_ref_fft_cache_valid[cache_idx] = 1;
+            }
+        }
+    }
+
+    d_zigbee_ref_fft_cache_ready = true;
+}
+
 void frame_equalizer_impl::reset_frame_capture()
 {
     d_current_symbol = 0;
@@ -374,7 +426,7 @@ void frame_equalizer_impl::reset_frame_capture()
     d_captured_symbol_count = 0;
     d_pending_meta = pmt::make_dict();
     d_last_correlation_score = 0.0;
-    d_last_zigbee_ltf_start_raw = 176;
+    d_last_zigbee_ltf_start_raw = ZIGBEE_DEFAULT_LTF_START_RAW;
 }
 
 bool frame_equalizer_impl::run_equalizer_attempt(gr_complex* frame_symbols,
@@ -460,41 +512,65 @@ bool frame_equalizer_impl::estimate_zigbee_channel_for_offset(int ltf_start_raw,
 bool frame_equalizer_impl::get_zigbee_reference_symbol_fft(int symbol_idx,
                                                            gr_complex* fft_symbol) const
 {
-    const int ltf_start_raw = 176;
-    return get_zigbee_reference_symbol_fft(symbol_idx, ltf_start_raw, fft_symbol);
+    return get_zigbee_reference_symbol_fft(
+        symbol_idx, ZIGBEE_DEFAULT_LTF_START_RAW, fft_symbol);
 }
 
 bool frame_equalizer_impl::get_zigbee_reference_symbol_fft(int symbol_idx,
                                                            int ltf_start_raw,
                                                            gr_complex* fft_symbol) const
 {
+    if (!d_zigbee_ref_fft_cache_ready || symbol_idx < 0 ||
+        symbol_idx >= d_zigbee_ref_fft_cache_symbol_count ||
+        ltf_start_raw < d_zigbee_ref_fft_cache_min_ltf_start_raw ||
+        ltf_start_raw > d_zigbee_ref_fft_cache_max_ltf_start_raw) {
+        return false;
+    }
+
+    const int offset_idx = ltf_start_raw - d_zigbee_ref_fft_cache_min_ltf_start_raw;
+    const int cache_idx = offset_idx * d_zigbee_ref_fft_cache_symbol_count + symbol_idx;
+    if (cache_idx < 0 || cache_idx >= (int)d_zigbee_ref_fft_cache.size() ||
+        !d_zigbee_ref_fft_cache_valid[cache_idx]) {
+        return false;
+    }
+
+    std::copy(d_zigbee_ref_fft_cache[cache_idx].begin(),
+              d_zigbee_ref_fft_cache[cache_idx].end(),
+              fft_symbol);
+    return true;
+}
+
+bool frame_equalizer_impl::compute_zigbee_reference_symbol_fft_uncached(
+    int symbol_idx,
+    int ltf_start_raw,
+    std::array<gr_complex, 64>& fft_symbol) const
+{
     if (!d_reference_ready) {
         return false;
     }
 
-    const int nfft = 64;
     const int start = raw_fft_start_from_symbol_idx(ltf_start_raw, symbol_idx);
-    if (start < 0 || start + nfft > (int)d_ref_wifi_rx_from_zigbee.size()) {
+    if (start < 0 || start + ZIGBEE_NFFT > (int)d_ref_wifi_rx_from_zigbee.size()) {
         return false;
     }
 
-    gr_complex unshifted_fft[64];
-    for (int k = 0; k < nfft; k++) {
+    gr_complex unshifted_fft[ZIGBEE_NFFT];
+    for (int k = 0; k < ZIGBEE_NFFT; k++) {
         fft_symbol[k] = gr_complex(0, 0);
         unshifted_fft[k] = gr_complex(0, 0);
     }
 
-    for (int bin = 0; bin < nfft; bin++) {
+    for (int bin = 0; bin < ZIGBEE_NFFT; bin++) {
         gr_complex acc(0, 0);
-        for (int n = 0; n < nfft; n++) {
-            const float angle = -2 * M_PI * bin * n / nfft;
+        for (int n = 0; n < ZIGBEE_NFFT; n++) {
+            const float angle = -2 * M_PI * bin * n / ZIGBEE_NFFT;
             acc += d_ref_wifi_rx_from_zigbee[start + n] * exp(gr_complex(0, angle));
         }
         unshifted_fft[bin] = acc;
     }
 
-    for (int bin = 0; bin < nfft; bin++) {
-        fft_symbol[bin] = unshifted_fft[(bin + nfft / 2) % nfft];
+    for (int bin = 0; bin < ZIGBEE_NFFT; bin++) {
+        fft_symbol[bin] = unshifted_fft[(bin + ZIGBEE_NFFT / 2) % ZIGBEE_NFFT];
     }
     return true;
 }
@@ -503,8 +579,8 @@ void frame_equalizer_impl::subtract_zigbee_interference(gr_complex h,
                                                         gr_complex* frame_symbols,
                                                         int total_symbols) const
 {
-    const int ltf_start_raw = 176;
-    subtract_zigbee_interference(h, ltf_start_raw, frame_symbols, total_symbols);
+    subtract_zigbee_interference(
+        h, ZIGBEE_DEFAULT_LTF_START_RAW, frame_symbols, total_symbols);
 }
 
 void frame_equalizer_impl::subtract_zigbee_interference(gr_complex h,
@@ -543,11 +619,8 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
 
     std::vector<gr_complex> salvaged_symbols;
     gr_complex salvaged_frame[(MAX_SYM + 3) * 64];
-    const int default_ltf_start_raw = 176;
-    const int search_radius = 144;
-    const int max_salvage_decode_attempts = 12;
     double best_failed_score = -1.0;
-    int best_failed_ltf_start_raw = default_ltf_start_raw;
+    int best_failed_ltf_start_raw = ZIGBEE_DEFAULT_LTF_START_RAW;
     d_correction_attempt_count++;
     write_correction_stats();
 
@@ -557,10 +630,10 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
         double score;
     };
     std::vector<ZigbeeCandidate> candidates;
-    candidates.reserve(2 * search_radius + 1);
+    candidates.reserve(2 * ZIGBEE_SEARCH_RADIUS + 1);
 
-    for (int candidate = default_ltf_start_raw - search_radius;
-         candidate <= default_ltf_start_raw + search_radius;
+    for (int candidate = ZIGBEE_DEFAULT_LTF_START_RAW - ZIGBEE_SEARCH_RADIUS;
+         candidate <= ZIGBEE_DEFAULT_LTF_START_RAW + ZIGBEE_SEARCH_RADIUS;
          candidate++) {
         gr_complex zigbee_h(0, 0);
         double zigbee_score = 0.0;
@@ -585,7 +658,8 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
     }
 
     const int decode_attempts =
-        std::min(max_salvage_decode_attempts, static_cast<int>(candidates.size()));
+        std::min(ZIGBEE_MAX_SALVAGE_DECODE_ATTEMPTS,
+                 static_cast<int>(candidates.size()));
     for (int idx = 0; idx < decode_attempts; idx++) {
         const ZigbeeCandidate& candidate = candidates[idx];
         d_last_zigbee_ltf_start_raw = candidate.ltf_start_raw;

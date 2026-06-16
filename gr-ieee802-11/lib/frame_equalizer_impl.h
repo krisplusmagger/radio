@@ -23,6 +23,7 @@
 #include "viterbi_decoder/viterbi_decoder.h"
 #include <ieee802_11/constellations.h>
 #include <ieee802_11/frame_equalizer.h>
+#include <array>
 #include <string>
 #include <vector>
 
@@ -60,6 +61,7 @@ private:
                                       int imag_col,
                                       std::vector<gr_complex>& out);
     bool load_reference_data();
+    void precompute_zigbee_reference_ffts();
     void reset_frame_capture();
     bool run_equalizer_attempt(gr_complex* frame_symbols,
                                uint8_t* out_bits,
@@ -72,6 +74,10 @@ private:
     bool get_zigbee_reference_symbol_fft(int symbol_idx,
                                          int ltf_start_raw,
                                          gr_complex* fft_symbol) const;
+    bool compute_zigbee_reference_symbol_fft_uncached(
+        int symbol_idx,
+        int ltf_start_raw,
+        std::array<gr_complex, 64>& fft_symbol) const;
     void subtract_zigbee_interference(gr_complex h,
                                       gr_complex* frame_symbols,
                                       int total_symbols) const;
@@ -134,6 +140,12 @@ private:
     std::vector<gr_complex> d_ref_ltf1;
     std::vector<gr_complex> d_ref_ltf2;
     std::vector<gr_complex> d_ref_wifi_rx_from_zigbee;
+    std::vector<std::array<gr_complex, 64>> d_zigbee_ref_fft_cache;
+    std::vector<uint8_t> d_zigbee_ref_fft_cache_valid;
+    int d_zigbee_ref_fft_cache_min_ltf_start_raw;
+    int d_zigbee_ref_fft_cache_max_ltf_start_raw;
+    int d_zigbee_ref_fft_cache_symbol_count;
+    bool d_zigbee_ref_fft_cache_ready;
     bool d_reference_ready;
 
     std::shared_ptr<gr::digital::constellation> d_frame_mod;
