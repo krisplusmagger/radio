@@ -7,6 +7,7 @@ The auto-run script archives files as:
 
 This script pairs those files, ranks runs by ZigBee correction recovery rate,
 prints the top runs, and computes the average recovery rate over the top N.
+It also writes a text summary with trimmed overall averages.
 """
 
 from __future__ import annotations
@@ -61,6 +62,15 @@ def to_int(values: Dict[str, str], key: str, default: int = 0) -> int:
         return default
 
 
+def optional_float(values: Dict[str, str], key: str) -> Optional[float]:
+    if key not in values:
+        return None
+    try:
+        return float(values[key])
+    except ValueError:
+        return None
+
+
 def archived_stats_files(directory: Path, prefix: str) -> Iterable[Path]:
     return sorted(directory.glob(f"{prefix}_*_run*.txt"))
 
@@ -110,32 +120,82 @@ def collect_runs(directory: Path) -> list[RunStats]:
     return runs
 
 
-def print_table(runs: list[RunStats], top: int, average_top: int) -> None:
+def average(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    return sum(values) / len(values)
+
+
+def trimmed_average(values: list[float]) -> tuple[float, int, Optional[float], Optional[float]]:
+    """Average after dropping one lowest and one highest value when possible."""
+    if not values:
+        return 0.0, 0, None, None
+
+    sorted_values = sorted(values)
+    if len(sorted_values) < 3:
+        return average(sorted_values), len(sorted_values), None, None
+
+    dropped_low = sorted_values[0]
+    dropped_high = sorted_values[-1]
+    trimmed = sorted_values[1:-1]
+    return average(trimmed), len(trimmed), dropped_low, dropped_high
+
+
+def build_report(runs: list[RunStats], top: int, average_top: int) -> list[str]:
     ranked = sorted(runs, key=lambda item: item.recovery_rate, reverse=True)
     if not ranked:
-        print("No archived zigbee_correction_stats_*_run*.txt files found.")
-        return
+        return ["No archived zigbee_correction_stats_*_run*.txt files found."]
 
     average_group = ranked[:average_top]
-    average = sum(item.recovery_rate for item in average_group) / len(average_group)
-
-    print(f"Found {len(ranked)} archived runs with ZigBee correction stats.")
-    print(
-        f"Average recovery_rate over top {len(average_group)} runs: "
-        f"{average:.6f} ({average * 100:.2f}%)"
+    top_recovery_average = average([item.recovery_rate for item in average_group])
+    all_recovery_rates = [item.recovery_rate for item in ranked]
+    throughput_values = [
+        value
+        for item in ranked
+        for value in [optional_float(item.seq, "throughput_bps")]
+        if value is not None
+    ]
+    trimmed_recovery, recovery_count, dropped_recovery_low, dropped_recovery_high = (
+        trimmed_average(all_recovery_rates)
     )
-    print()
-    print(f"Top {min(top, len(ranked))} runs by recovery_rate:")
+    trimmed_throughput, throughput_count, dropped_throughput_low, dropped_throughput_high = (
+        trimmed_average(throughput_values)
+    )
+
+    lines = [
+        f"Found {len(ranked)} archived runs with ZigBee correction stats.",
+        f"Average recovery_rate over top {len(average_group)} runs: "
+        f"{top_recovery_average:.6f} ({top_recovery_average * 100:.2f}%)",
+        (
+            f"Overall trimmed recovery_rate average: {trimmed_recovery:.6f} "
+            f"({trimmed_recovery * 100:.2f}%) from {recovery_count} runs"
+        ),
+        (
+            f"Overall trimmed throughput_bps average: {trimmed_throughput:.3f} "
+            f"from {throughput_count} runs"
+        ),
+    ]
+    if dropped_recovery_low is not None and dropped_recovery_high is not None:
+        lines.append(
+            "Dropped recovery_rate outliers: "
+            f"lowest={dropped_recovery_low:.6f}, highest={dropped_recovery_high:.6f}"
+        )
+    if dropped_throughput_low is not None and dropped_throughput_high is not None:
+        lines.append(
+            "Dropped throughput_bps outliers: "
+            f"lowest={dropped_throughput_low:.3f}, highest={dropped_throughput_high:.3f}"
+        )
+    lines.extend(["", f"Top {min(top, len(ranked))} runs by recovery_rate:"])
 
     header = (
         "rank run stamp recovery_rate attempts successes throughput_bps "
         "ack_count nack_count total_tx elapsed_s corr ltf_start"
     )
-    print(header)
-    print("-" * len(header))
+    lines.append(header)
+    lines.append("-" * len(header))
 
     for rank, item in enumerate(ranked[:top], start=1):
-        print(
+        lines.append(
             f"{rank} "
             f"{item.run:04d} "
             f"{item.stamp} "
@@ -151,11 +211,16 @@ def print_table(runs: list[RunStats], top: int, average_top: int) -> None:
             f"{to_int(item.zigbee, 'last_ltf_start_raw')}"
         )
 
-    print()
-    print("File pairs:")
+    lines.extend(["", "File pairs:"])
     for item in ranked[:top]:
         seq_name = item.seq_path.name if item.seq_path else "missing"
-        print(f"run{item.run:04d}: {seq_name} + {item.zigbee_path.name}")
+        lines.append(f"run{item.run:04d}: {seq_name} + {item.zigbee_path.name}")
+
+    return lines
+
+
+def print_table(runs: list[RunStats], top: int, average_top: int) -> None:
+    print("\n".join(build_report(runs, top, average_top)))
 
 
 def write_csv(path: Path, runs: list[RunStats]) -> None:
@@ -208,6 +273,10 @@ def write_csv(path: Path, runs: list[RunStats]) -> None:
             )
 
 
+def write_summary_txt(path: Path, runs: list[RunStats], top: int, average_top: int) -> None:
+    path.write_text("\n".join(build_report(runs, top, average_top)) + "\n")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Rank archived WiFi/ZigBee experiment runs by recovery rate."
@@ -226,10 +295,19 @@ def main() -> int:
         help="Number of top recovery rates to average.",
     )
     parser.add_argument("--csv", type=Path, help="Optional CSV output path.")
+    parser.add_argument(
+        "--summary-txt",
+        type=Path,
+        help="Text report output path. Defaults to recovery_stats_summary.txt.",
+    )
     args = parser.parse_args()
 
     runs = collect_runs(args.directory)
     print_table(runs, max(args.top, 0), max(args.average_top, 1))
+
+    summary_path = args.summary_txt or args.directory / "recovery_stats_summary.txt"
+    write_summary_txt(summary_path, runs, max(args.top, 0), max(args.average_top, 1))
+    print(f"Wrote text summary: {summary_path}")
 
     if args.csv:
         write_csv(args.csv, runs)
