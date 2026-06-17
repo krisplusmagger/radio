@@ -8,6 +8,9 @@ Each run:
 3. Stops the flowgraph on timeout, or notices an early crash/exit.
 4. Archives seq_pdu_stats.txt and zigbee_correction_stats.txt with a timestamp.
 5. Starts the next run.
+
+Example:
+    python3 auto_run_wifi_zigbee.py --total-duration 5h
 """
 
 from __future__ import annotations
@@ -25,6 +28,52 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_STATS_FILES = ("seq_pdu_stats.txt", "zigbee_correction_stats.txt")
+
+
+def parse_duration(value: str) -> float:
+    text = value.strip().lower()
+    if not text:
+        raise argparse.ArgumentTypeError("duration cannot be empty")
+
+    multipliers = {
+        "s": 1.0,
+        "sec": 1.0,
+        "secs": 1.0,
+        "second": 1.0,
+        "seconds": 1.0,
+        "m": 60.0,
+        "min": 60.0,
+        "mins": 60.0,
+        "minute": 60.0,
+        "minutes": 60.0,
+        "h": 3600.0,
+        "hr": 3600.0,
+        "hrs": 3600.0,
+        "hour": 3600.0,
+        "hours": 3600.0,
+    }
+
+    for suffix, multiplier in sorted(multipliers.items(), key=lambda item: -len(item[0])):
+        if text.endswith(suffix):
+            number = text[: -len(suffix)].strip()
+            if not number:
+                raise argparse.ArgumentTypeError(f"invalid duration: {value}")
+            return float(number) * multiplier
+
+    return float(text)
+
+
+def format_duration(seconds: float) -> str:
+    if seconds <= 0:
+        return "unlimited"
+
+    hours, rem = divmod(int(seconds), 3600)
+    minutes, secs = divmod(rem, 60)
+    if hours:
+        return f"{hours}h {minutes}m {secs}s"
+    if minutes:
+        return f"{minutes}m {secs}s"
+    return f"{secs}s"
 
 
 def timestamp() -> str:
@@ -152,6 +201,15 @@ def parse_args() -> argparse.Namespace:
         help="Seconds per run before the flowgraph is stopped and restarted.",
     )
     parser.add_argument(
+        "--total-duration",
+        type=parse_duration,
+        default=0.0,
+        help=(
+            "Total experiment runtime before no new runs are started. "
+            "Use 0 for unlimited. Examples: 5h, 300m, 18000s."
+        ),
+    )
+    parser.add_argument(
         "--runs",
         type=int,
         default=0,
@@ -218,8 +276,23 @@ def main() -> int:
         return 1
 
     run_index = 1
+    total_start = time.monotonic()
+    original_run_duration = args.duration
+    print(f"[auto-run] Total runtime: {format_duration(args.total_duration)}")
     try:
         while args.runs == 0 or run_index <= args.runs:
+            elapsed_total = time.monotonic() - total_start
+            if args.total_duration > 0 and elapsed_total >= args.total_duration:
+                print("[auto-run] Total runtime reached; stopping before next run.")
+                break
+
+            if args.total_duration > 0:
+                remaining_total = args.total_duration - elapsed_total
+                args.duration = min(original_run_duration, remaining_total)
+                if args.duration <= 0:
+                    print("[auto-run] Total runtime reached; stopping before next run.")
+                    break
+
             if not args.no_generate:
                 run_checked(["grcc", "-o", str(SCRIPT_DIR), str(args.grc_file)], SCRIPT_DIR)
 
@@ -234,7 +307,14 @@ def main() -> int:
             if args.runs != 0 and run_index > args.runs:
                 break
 
-            time.sleep(args.restart_delay)
+            if args.total_duration > 0:
+                remaining_total = args.total_duration - (time.monotonic() - total_start)
+                if remaining_total <= 0:
+                    print("[auto-run] Total runtime reached; stopping after last run.")
+                    break
+                time.sleep(min(args.restart_delay, remaining_total))
+            else:
+                time.sleep(args.restart_delay)
     except KeyboardInterrupt:
         print("\n[auto-run] Stopped by user.")
 
