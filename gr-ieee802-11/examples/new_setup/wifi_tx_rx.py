@@ -107,7 +107,7 @@ class wifi_tx_rx(gr.top_block, Qt.QWidget):
         ##################################################
         # Variables
         ##################################################
-        self.tx_gain_zig = tx_gain_zig = 0.5
+        self.tx_gain_zig = tx_gain_zig = 1
         self.tx_gain = tx_gain = 0.8
         self.samp_rate_zig = samp_rate_zig = 2e5
         self.samp_rate = samp_rate = 2e6
@@ -121,7 +121,7 @@ class wifi_tx_rx(gr.top_block, Qt.QWidget):
         # Blocks
         ##################################################
 
-        self._tx_gain_zig_range = qtgui.Range(0, 1, 0.01, 0.5, 200)
+        self._tx_gain_zig_range = qtgui.Range(0, 1, 0.01, 1, 200)
         self._tx_gain_zig_win = qtgui.RangeWidget(self._tx_gain_zig_range, self.set_tx_gain_zig, "'tx_gain_zig'", "counter_slider", float, QtCore.Qt.Horizontal)
         self.top_layout.addWidget(self._tx_gain_zig_win)
         self._tx_gain_range = qtgui.Range(0, 1, 0.01, 0.8, 200)
