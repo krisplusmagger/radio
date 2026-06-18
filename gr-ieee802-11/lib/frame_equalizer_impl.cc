@@ -471,7 +471,7 @@ bool frame_equalizer_impl::estimate_zigbee_channel_for_offset(int ltf_start_raw,
                                                               gr_complex& h,
                                                               double& score) const
 {
-    if (!d_reference_ready || d_captured_symbol_count < 2) {
+    if (!d_reference_ready || d_captured_symbol_count <= 0) {
         h = gr_complex(0, 0);
         score = 0.0;
         return false;
@@ -485,7 +485,9 @@ bool frame_equalizer_impl::estimate_zigbee_channel_for_offset(int ltf_start_raw,
     double ref_energy = 0.0;
     int used_symbols = 0;
 
-    for (int sym = 0; sym < 2; sym++) {
+    const int usable_symbols =
+        std::min(d_captured_symbol_count, std::max(2, d_frame.n_sym + 3));
+    for (int sym = 0; sym < usable_symbols; sym++) {
         if (!get_zigbee_reference_symbol_fft(sym, ltf_start_raw, ref_fft)) {
             continue;
         }
