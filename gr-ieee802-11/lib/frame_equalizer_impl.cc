@@ -37,7 +37,6 @@ constexpr int ZIGBEE_DEFAULT_LTF_START_RAW = 176;
 constexpr int ZIGBEE_SEARCH_RADIUS = 144;
 constexpr int ZIGBEE_MAX_SALVAGE_DECODE_ATTEMPTS = 144;
 constexpr int ZIGBEE_NFFT = 64;
-constexpr float ZIGBEE_CANCEL_SCALES[] = { 1.0f, 0.75f, 1.25f, 0.5f, 1.5f };
 } // namespace
 
 frame_equalizer::sptr
@@ -75,7 +74,6 @@ frame_equalizer_impl::frame_equalizer_impl(
       d_correction_attempt_count(0),
       d_correction_crc_success_count(0),
       d_last_correlation_score(0.0),
-      d_last_zigbee_scale(1.0),
       d_last_zigbee_ltf_start_raw(ZIGBEE_DEFAULT_LTF_START_RAW),
       d_zigbee_ref_fft_cache_min_ltf_start_raw(0),
       d_zigbee_ref_fft_cache_max_ltf_start_raw(-1),
@@ -428,7 +426,6 @@ void frame_equalizer_impl::reset_frame_capture()
     d_captured_symbol_count = 0;
     d_pending_meta = pmt::make_dict();
     d_last_correlation_score = 0.0;
-    d_last_zigbee_scale = 1.0;
     d_last_zigbee_ltf_start_raw = ZIGBEE_DEFAULT_LTF_START_RAW;
 }
 
@@ -669,27 +666,22 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
         d_last_zigbee_ltf_start_raw = candidate.ltf_start_raw;
         d_last_correlation_score = candidate.score;
 
-        for (float scale : ZIGBEE_CANCEL_SCALES) {
-            d_last_zigbee_scale = scale;
-            std::memcpy(salvaged_frame,
-                        d_captured_symbols,
-                        d_captured_symbol_count * 64 * sizeof(gr_complex));
-            subtract_zigbee_interference(candidate.h * scale,
-                                         candidate.ltf_start_raw,
-                                         salvaged_frame,
-                                         d_frame.n_sym + 3);
+        std::memcpy(salvaged_frame,
+                    d_captured_symbols,
+                    d_captured_symbol_count * 64 * sizeof(gr_complex));
+        subtract_zigbee_interference(
+            candidate.h, candidate.ltf_start_raw, salvaged_frame, d_frame.n_sym + 3);
 
-            salvaged_symbols.clear();
-            run_equalizer_attempt(salvaged_frame, attempt_bits, salvaged_symbols);
-            if (decode_payload(attempt_bits, false)) {
-                std::memcpy(final_bits, attempt_bits, d_frame.n_sym * 48);
-                final_symbols.swap(salvaged_symbols);
-                salvaged = true;
-                d_correction_crc_success_count++;
-                write_correction_stats();
-                message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
-                return true;
-            }
+        salvaged_symbols.clear();
+        run_equalizer_attempt(salvaged_frame, attempt_bits, salvaged_symbols);
+        if (decode_payload(attempt_bits, false)) {
+            std::memcpy(final_bits, attempt_bits, d_frame.n_sym * 48);
+            final_symbols.swap(salvaged_symbols);
+            salvaged = true;
+            d_correction_crc_success_count++;
+            write_correction_stats();
+            message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
+            return true;
         }
     }
 
@@ -766,7 +758,6 @@ void frame_equalizer_impl::write_correction_stats()
                   static_cast<double>(d_correction_attempt_count);
     stats_file << "recovery_rate=" << recovery_rate << "\n";
     stats_file << "last_correlation_score=" << d_last_correlation_score << "\n";
-    stats_file << "last_zigbee_scale=" << d_last_zigbee_scale << "\n";
     stats_file << "last_ltf_start_raw=" << d_last_zigbee_ltf_start_raw << "\n";
 }
 
