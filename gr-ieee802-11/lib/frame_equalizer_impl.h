@@ -136,6 +136,7 @@ private:
     uint64_t d_correction_attempt_count;
     uint64_t d_correction_crc_success_count;
     double d_last_correlation_score;
+    double d_last_zigbee_scale;
     int d_last_zigbee_ltf_start_raw;
     std::vector<gr_complex> d_ref_ltf1;
     std::vector<gr_complex> d_ref_ltf2;
