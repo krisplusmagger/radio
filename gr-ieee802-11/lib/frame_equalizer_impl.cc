@@ -35,7 +35,7 @@ namespace ieee802_11 {
 namespace {
 constexpr int ZIGBEE_DEFAULT_LTF_START_RAW = 176;
 constexpr int ZIGBEE_SEARCH_RADIUS = 144;
-constexpr int ZIGBEE_MAX_SALVAGE_DECODE_ATTEMPTS = 12;
+constexpr int ZIGBEE_MAX_SALVAGE_DECODE_ATTEMPTS = 144;
 constexpr int ZIGBEE_NFFT = 64;
 } // namespace
 

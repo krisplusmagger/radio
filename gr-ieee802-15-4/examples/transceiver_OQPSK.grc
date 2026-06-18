@@ -234,7 +234,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [312, 576.0]
+    coordinate: [416, 680.0]
     rotation: 0
     state: enabled
 - name: digital_crc16_async_bb_1
@@ -250,7 +250,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [912, 584.0]
+    coordinate: [904, 624.0]
     rotation: 0
     state: enabled
 - name: digital_crc32_bb_0

@@ -82,11 +82,11 @@ class blk(gr.basic_block):
             if elapsed_seconds > 0
             else 0.0
         )
-        tx_rate_bps = (
-            self.tx_payload_bytes * 8 / elapsed_seconds
-            if elapsed_seconds > 0
-            else 0.0
-        )
+        # tx_rate_bps = (
+        #     self.tx_payload_bytes * 8 / elapsed_seconds
+        #     if elapsed_seconds > 0
+        #     else 0.0
+        # )
 
         with open(self.stats_filename, "w", encoding="ascii") as stats_file:
             stats_file.write(f"current_seq={self.seq:06d}\n")
@@ -99,4 +99,4 @@ class blk(gr.basic_block):
             stats_file.write(f"acked_payload_bytes={self.acked_payload_bytes}\n")
             stats_file.write(f"elapsed_seconds={elapsed_seconds:.6f}\n")
             stats_file.write(f"throughput_bps={throughput_bps:.3f}\n")
-            stats_file.write(f"tx_rate_bps={tx_rate_bps:.3f}\n")
+            # stats_file.write(f"tx_rate_bps={tx_rate_bps:.3f}\n")
