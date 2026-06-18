@@ -312,7 +312,7 @@ class wifi_tx_rx(gr.top_block, Qt.QWidget):
         self.msg_connect((self.digital_crc16_async_bb_0, 'out'), (self.ieee802_15_4_oqpsk_phy_0, 'txin'))
         self.msg_connect((self.digital_crc32_async_bb_0, 'out'), (self.wifi_phy_hier_0, 'mac_in'))
         self.msg_connect((self.ieee802_15_4_oqpsk_phy_0, 'rxout'), (self.digital_crc16_async_bb_1, 'in'))
-        self.msg_connect((self.seq_input, 'out'), (self.digital_crc16_async_bb_0, 'in'))
+        self.msg_connect((self.seq_input, 'zigbee_out'), (self.digital_crc16_async_bb_0, 'in'))
         self.msg_connect((self.seq_input, 'out'), (self.digital_crc32_async_bb_0, 'in'))
         self.msg_connect((self.wifi_phy_hier_0, 'mac_out'), (self.convert_ascii_0, 'in'))
         self.msg_connect((self.wifi_phy_hier_0, 'tx_feedback'), (self.seq_input, 'feedback'))

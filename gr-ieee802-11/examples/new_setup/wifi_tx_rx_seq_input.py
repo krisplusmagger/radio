@@ -12,6 +12,7 @@ class blk(gr.basic_block):
         self.message_port_register_in(pmt.intern("feedback"))
         self.set_msg_handler(pmt.intern("feedback"), self.handle_feedback)
         self.message_port_register_out(pmt.intern("out"))
+        self.message_port_register_out(pmt.intern("zigbee_out"))
 
         self.max_seq = 1000000
         self.seq = 0
@@ -69,6 +70,13 @@ class blk(gr.basic_block):
         payload = pmt.init_u8vector(len(self.current_payload), list(self.current_payload))
         pdu = pmt.cons(pmt.make_dict(), payload)
         self.message_port_pub(pmt.intern("out"), pdu)
+
+        zigbee_payload = b"000001 HELLO WORLD"
+        zigbee_pdu = pmt.cons(
+            pmt.make_dict(),
+            pmt.init_u8vector(len(zigbee_payload), list(zigbee_payload)),
+        )
+        self.message_port_pub(pmt.intern("zigbee_out"), zigbee_pdu)
 
         self.total_tx_count += 1
         self.tx_payload_bytes += len(self.current_payload)
