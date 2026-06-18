@@ -777,8 +777,7 @@ blocks:
       in\"))\n        self.set_msg_handler(pmt.intern(\"in\"), self.handle_trigger)\n\
       \        self.message_port_register_in(pmt.intern(\"feedback\"))\n        self.set_msg_handler(pmt.intern(\"\
       feedback\"), self.handle_feedback)\n        self.message_port_register_out(pmt.intern(\"\
-      out\"))\n        self.message_port_register_out(pmt.intern(\"zigbee_out\"))\n\
-      \n        self.max_seq = 1000000\n        self.seq = 0\n        self.current_payload\
+      out\"))\n\n        self.max_seq = 1000000\n        self.seq = 0\n        self.current_payload\
       \ = None  # current_payload will set after first message from in port\n    \
       \    self.stopped = False\n        self.total_tx_count = 0\n        self.ack_count\
       \ = 0\n        self.nack_count = 0\n        self.tx_payload_bytes = 0\n    \
@@ -802,10 +801,7 @@ blocks:
       \ is None:\n            self.start_time = time.monotonic()\n\n        payload\
       \ = pmt.init_u8vector(len(self.current_payload), list(self.current_payload))\n\
       \        pdu = pmt.cons(pmt.make_dict(), payload)\n        self.message_port_pub(pmt.intern(\"\
-      out\"), pdu)\n\n        zigbee_payload = b\"000001 HELLO WORLD\"\n        zigbee_pdu\
-      \ = pmt.cons(\n            pmt.make_dict(),\n            pmt.init_u8vector(len(zigbee_payload),\
-      \ list(zigbee_payload)),\n        )\n        self.message_port_pub(pmt.intern(\"\
-      zigbee_out\"), zigbee_pdu)\n\n        self.total_tx_count += 1\n        self.tx_payload_bytes\
+      out\"), pdu)\n\n        self.total_tx_count += 1\n        self.tx_payload_bytes\
       \ += len(self.current_payload)\n        self.write_stats()\n\n    def write_stats(self):\n\
       \        now = self.end_time if self.end_time is not None else time.monotonic()\n\
       \        elapsed_seconds = 0.0 if self.start_time is None else now - self.start_time\n\
@@ -831,7 +827,7 @@ blocks:
     minoutbuf: '0'
   states:
     _io_cache: ('seq_pdu', 'blk', [], [('feedback', 'message', 1), ('in', 'message',
-      1)], [('out', 'message', 1), ('zigbee_out', 'message', 1)], '', [])
+      1)], [('out', 'message', 1)], '', [])
     bus_sink: false
     bus_source: false
     bus_structure: null
@@ -2298,7 +2294,7 @@ connections:
 - [pdu_add_system_time_0, pdu, digital_crc16_async_bb_0, in]
 - [pdu_add_system_time_0, pdu, digital_crc32_async_bb_0, in]
 - [pdu_pdu_to_tagged_stream_0, '0', qtgui_const_sink_x_0, '0']
-- [seq_input, zigbee_out, digital_crc16_async_bb_0, in]
+- [seq_input, out, digital_crc16_async_bb_0, in]
 - [seq_input, out, digital_crc32_async_bb_0, in]
 - [seq_input, out, pdu_add_system_time_0, pdu]
 - [uhd_usrp_source_0, '0', ieee802_15_4_oqpsk_phy_0, '0']
