@@ -33,9 +33,9 @@ namespace gr {
 namespace ieee802_11 {
 
 namespace {
-constexpr int ZIGBEE_DEFAULT_LTF_START_RAW = 126;
-constexpr int ZIGBEE_SEARCH_RADIUS = 96;
-constexpr int ZIGBEE_MAX_SALVAGE_DECODE_ATTEMPTS = 144;
+constexpr int ZIGBEE_DEFAULT_LTF_START_RAW = 176;
+constexpr int ZIGBEE_SEARCH_RADIUS = 20;
+constexpr int ZIGBEE_MAX_SALVAGE_DECODE_ATTEMPTS = 41; // search radius * 2 + 1
 constexpr int ZIGBEE_NFFT = 64;
 } // namespace
 
@@ -446,7 +446,7 @@ bool frame_equalizer_impl::run_equalizer_attempt(gr_complex* frame_symbols,
     std::unique_ptr<equalizer::base> eq(create_equalizer(d_algorithm));
     uint8_t scratch_bits[48];
     gr_complex scratch_symbols[48];
-
+    // using the two ltf build dH
     eq->equalize(frame_symbols, 0, scratch_symbols, scratch_bits, d_bpsk);
     eq->equalize(frame_symbols + 64, 1, scratch_symbols, scratch_bits, d_bpsk);
 
