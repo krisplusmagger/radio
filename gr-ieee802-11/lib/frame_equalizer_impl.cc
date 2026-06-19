@@ -244,7 +244,17 @@ int frame_equalizer_impl::general_work(int noutput_items,
                         64 * sizeof(gr_complex));
             d_captured_symbol_count = std::max(d_captured_symbol_count, d_current_symbol + 1);
         }
-  
+
+        // Feed LTF0/LTF1 before decoding SIGNAL so the stateful equalizer builds
+        // the current frame's Wi-Fi channel estimate.
+        if (d_current_symbol < 2) {
+            uint8_t dummy_bits[48];
+            gr_complex dummy_symbols[48];
+
+            d_equalizer->equalize(
+                current_symbol, d_current_symbol, dummy_symbols, dummy_bits, d_bpsk);
+        }
+
         // signal field
         if (d_current_symbol == 2) {
             uint8_t signal_bits[48];
