@@ -610,12 +610,14 @@ void frame_equalizer_impl::subtract_zigbee_interference(gr_complex h,
     }
 
     gr_complex ref_fft[64];
-    static constexpr int affected_bins[] = { 29, 30, 31, 32, 33, 34, 35 };
     for (int sym = 0; sym < total_symbols; sym++) {
         if (!get_zigbee_reference_symbol_fft(sym, ltf_start_raw, ref_fft)) {
             break;
         }
-        for (int bin : affected_bins) {
+        // Subtract the ZigBee reference across all 64 FFT bins (not just the
+        // DC-region bins), so spectral leakage outside the main ZigBee bins is
+        // cancelled too.
+        for (int bin = 0; bin < 64; bin++) {
             frame_symbols[sym * 64 + bin] -= h * ref_fft[bin];
         }
     }
