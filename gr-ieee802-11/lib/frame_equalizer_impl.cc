@@ -450,6 +450,13 @@ bool frame_equalizer_impl::run_equalizer_attempt(gr_complex* frame_symbols,
     eq->equalize(frame_symbols, 0, scratch_symbols, scratch_bits, d_bpsk);
     eq->equalize(frame_symbols + 64, 1, scratch_symbols, scratch_bits, d_bpsk);
 
+    // Equalize the SIGNAL field (symbol 2, always BPSK) before the data
+    // symbols. The reference upstream equalizer feeds every symbol
+    // 0,1,2,3,...,n through the equalizer in order, so its decision-directed
+    // channel estimate adapts through the SIGNAL symbol too. Skipping it left
+    // d_H one adaptation step behind for every data symbol of the frame.
+    eq->equalize(frame_symbols + 2 * 64, 2, scratch_symbols, scratch_bits, d_bpsk);
+
     out_symbols.clear();
     out_symbols.reserve(d_frame.n_sym * 48);
 
