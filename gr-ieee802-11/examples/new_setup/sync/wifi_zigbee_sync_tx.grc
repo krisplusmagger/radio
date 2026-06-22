@@ -240,18 +240,6 @@ blocks:
     rotation: 0
     state: enabled
 - name: samp_rate
-  id: variable
-  parameters:
-    comment: ''
-    value: 20e6
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [200, 12]
-    rotation: 0
-    state: disabled
-- name: samp_rate
   id: variable_qtgui_chooser
   parameters:
     comment: ''
