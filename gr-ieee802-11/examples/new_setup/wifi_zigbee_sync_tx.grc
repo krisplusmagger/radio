@@ -11,7 +11,7 @@ options:
     gen_linking: dynamic
     generate_options: qt_gui
     hier_block_src_path: '.:'
-    id: wifi_tx_rx
+    id: wifi_zigbee_sync_tx
     max_nouts: '0'
     output_language: python
     placement: (0,0)
@@ -22,16 +22,17 @@ options:
     run_options: prompt
     sizing_mode: fixed
     thread_safe_setters: ''
-    title: Not titled yet
+    title: WiFi+ZigBee timed-burst sync TX (no ACK, rate-capped)
     window_size: (1000,1000)
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [8, 8]
+    coordinate:
+    - 8
+    - 8
     rotation: 0
     state: enabled
-
 blocks:
 - name: chan_est
   id: variable_qtgui_chooser
@@ -60,7 +61,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [456, 24.0]
+    coordinate:
+    - 456
+    - 24.0
     rotation: 0
     state: enabled
 - name: encoding
@@ -74,8 +77,7 @@ blocks:
     label2: ''
     label3: ''
     label4: ''
-    labels: '["BPSK 1/2", "BPSK 3/4", "QPSK 1/2", "QPSK 3/4", "16QAM 1/2", "16QAM
-      3/4", "64QAM 2/3", "64QAM 3/4"]'
+    labels: '["BPSK 1/2", "BPSK 3/4", "QPSK 1/2", "QPSK 3/4", "16QAM 1/2", "16QAM 3/4", "64QAM 2/3", "64QAM 3/4"]'
     num_opts: '0'
     option0: '0'
     option1: '1'
@@ -91,7 +93,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [616, 16.0]
+    coordinate:
+    - 616
+    - 16.0
     rotation: 0
     state: enabled
 - name: freq
@@ -105,45 +109,14 @@ blocks:
     label2: ''
     label3: ''
     label4: ''
-    labels: '[''  1 | 2412.0 | 11g'', ''  2 | 2417.0 | 11g'', ''  3 | 2422.0 | 11g'',
-      ''  4 | 2427.0 | 11g'', ''  5 | 2432.0 | 11g'', ''  6 | 2437.0 | 11g'', ''  7
-      | 2442.0 | 11g'', ''  8 | 2447.0 | 11g'', ''  9 | 2452.0 | 11g'', '' 10 | 2457.0
-      | 11g'', '' 11 | 2462.0 | 11g'', '' 12 | 2467.0 | 11g'', '' 13 | 2472.0 | 11g'',
-      '' 14 | 2484.0 | 11g'', '' 34 | 5170.0 | 11a'', '' 36 | 5180.0 | 11a'', '' 38
-      | 5190.0 | 11a'', '' 40 | 5200.0 | 11a'', '' 42 | 5210.0 | 11a'', '' 44 | 5220.0
-      | 11a'', '' 46 | 5230.0 | 11a'', '' 48 | 5240.0 | 11a'', '' 50 | 5250.0 | 11a'',
-      '' 52 | 5260.0 | 11a'', '' 54 | 5270.0 | 11a'', '' 56 | 5280.0 | 11a'', '' 58
-      | 5290.0 | 11a'', '' 60 | 5300.0 | 11a'', '' 62 | 5310.0 | 11a'', '' 64 | 5320.0
-      | 11a'', ''100 | 5500.0 | 11a'', ''102 | 5510.0 | 11a'', ''104 | 5520.0 | 11a'',
-      ''106 | 5530.0 | 11a'', ''108 | 5540.0 | 11a'', ''110 | 5550.0 | 11a'', ''112
-      | 5560.0 | 11a'', ''114 | 5570.0 | 11a'', ''116 | 5580.0 | 11a'', ''118 | 5590.0
-      | 11a'', ''120 | 5600.0 | 11a'', ''122 | 5610.0 | 11a'', ''124 | 5620.0 | 11a'',
-      ''126 | 5630.0 | 11a'', ''128 | 5640.0 | 11a'', ''132 | 5660.0 | 11a'', ''134
-      | 5670.0 | 11a'', ''136 | 5680.0 | 11a'', ''138 | 5690.0 | 11a'', ''140 | 5700.0
-      | 11a'', ''142 | 5710.0 | 11a'', ''144 | 5720.0 | 11a'', ''149 | 5745.0 | 11a
-      (SRD)'', ''151 | 5755.0 | 11a (SRD)'', ''153 | 5765.0 | 11a (SRD)'', ''155 |
-      5775.0 | 11a (SRD)'', ''157 | 5785.0 | 11a (SRD)'', ''159 | 5795.0 | 11a (SRD)'',
-      ''161 | 5805.0 | 11a (SRD)'', ''165 | 5825.0 | 11a (SRD)'', ''172 | 5860.0 |
-      11p'', ''174 | 5870.0 | 11p'', ''176 | 5880.0 | 11p'', ''178 | 5890.0 | 11p'',
-      ''180 | 5900.0 | 11p'', ''182 | 5910.0 | 11p'', ''184 | 5920.0 | 11p'']'
+    labels: '[''  1 | 2412.0 | 11g'', ''  2 | 2417.0 | 11g'', ''  3 | 2422.0 | 11g'', ''  4 | 2427.0 | 11g'', ''  5 | 2432.0 | 11g'', ''  6 | 2437.0 | 11g'', ''  7 | 2442.0 | 11g'', ''  8 | 2447.0 | 11g'', ''  9 | 2452.0 | 11g'', '' 10 | 2457.0 | 11g'', '' 11 | 2462.0 | 11g'', '' 12 | 2467.0 | 11g'', '' 13 | 2472.0 | 11g'', '' 14 | 2484.0 | 11g'', '' 34 | 5170.0 | 11a'', '' 36 | 5180.0 | 11a'', '' 38 | 5190.0 | 11a'', '' 40 | 5200.0 | 11a'', '' 42 | 5210.0 | 11a'', '' 44 | 5220.0 | 11a'', '' 46 | 5230.0 | 11a'', '' 48 | 5240.0 | 11a'', '' 50 | 5250.0 | 11a'', '' 52 | 5260.0 | 11a'', '' 54 | 5270.0 | 11a'', '' 56 | 5280.0 | 11a'', '' 58 | 5290.0 | 11a'', '' 60 | 5300.0 | 11a'', '' 62 | 5310.0 | 11a'', '' 64 | 5320.0 | 11a'', ''100 | 5500.0 | 11a'', ''102 | 5510.0 | 11a'', ''104 | 5520.0 | 11a'', ''106 | 5530.0 | 11a'', ''108 | 5540.0 | 11a'', ''110 | 5550.0 | 11a'', ''112 | 5560.0 | 11a'', ''114 | 5570.0 | 11a'', ''116 | 5580.0 | 11a'', ''118 | 5590.0 | 11a'', ''120 | 5600.0 | 11a'', ''122 | 5610.0 | 11a'', ''124 | 5620.0 | 11a'', ''126 | 5630.0 | 11a'', ''128 | 5640.0 | 11a'', ''132 | 5660.0 | 11a'', ''134 | 5670.0 | 11a'', ''136 | 5680.0 | 11a'', ''138 | 5690.0 | 11a'', ''140 | 5700.0 | 11a'', ''142 | 5710.0 | 11a'', ''144 | 5720.0 | 11a'', ''149 | 5745.0 | 11a (SRD)'', ''151 | 5755.0 | 11a (SRD)'', ''153 | 5765.0 | 11a (SRD)'', ''155 | 5775.0 | 11a (SRD)'', ''157 | 5785.0 | 11a (SRD)'', ''159 | 5795.0 | 11a (SRD)'', ''161 | 5805.0 | 11a (SRD)'', ''165 | 5825.0 | 11a (SRD)'', ''172 | 5860.0 | 11p'', ''174 | 5870.0 | 11p'', ''176 | 5880.0 | 11p'', ''178 | 5890.0 | 11p'', ''180 | 5900.0 | 11p'', ''182 | 5910.0 | 11p'', ''184 | 5920.0 | 11p'']'
     num_opts: '0'
     option0: '0'
     option1: '1'
     option2: '2'
     option3: '3'
     option4: '4'
-    options: '[4890000000.0, 2417000000.0, 2422000000.0, 2427000000.0, 2432000000.0,
-      2437000000.0, 2442000000.0, 2447000000.0, 2452000000.0, 2457000000.0, 2462000000.0,
-      2467000000.0, 2472000000.0, 2484000000.0, 5170000000.0, 5180000000.0, 5190000000.0,
-      5200000000.0, 5210000000.0, 5220000000.0, 5230000000.0, 5240000000.0, 5250000000.0,
-      5260000000.0, 5270000000.0, 5280000000.0, 5290000000.0, 5300000000.0, 5310000000.0,
-      5320000000.0, 5500000000.0, 5510000000.0, 5520000000.0, 5530000000.0, 5540000000.0,
-      5550000000.0, 5560000000.0, 5570000000.0, 5580000000.0, 5590000000.0, 5600000000.0,
-      5610000000.0, 5620000000.0, 5630000000.0, 5640000000.0, 5660000000.0, 5670000000.0,
-      5680000000.0, 5690000000.0, 5700000000.0, 5710000000.0, 5720000000.0, 5745000000.0,
-      5755000000.0, 5765000000.0, 5775000000.0, 5785000000.0, 5795000000.0, 5805000000.0,
-      5825000000.0, 5860000000.0, 5870000000.0, 5880000000.0, 5890000000.0, 5900000000.0,
-      5910000000.0, 5920000000.0]'
+    options: '[4890000000.0, 2417000000.0, 2422000000.0, 2427000000.0, 2432000000.0, 2437000000.0, 2442000000.0, 2447000000.0, 2452000000.0, 2457000000.0, 2462000000.0, 2467000000.0, 2472000000.0, 2484000000.0, 5170000000.0, 5180000000.0, 5190000000.0, 5200000000.0, 5210000000.0, 5220000000.0, 5230000000.0, 5240000000.0, 5250000000.0, 5260000000.0, 5270000000.0, 5280000000.0, 5290000000.0, 5300000000.0, 5310000000.0, 5320000000.0, 5500000000.0, 5510000000.0, 5520000000.0, 5530000000.0, 5540000000.0, 5550000000.0, 5560000000.0, 5570000000.0, 5580000000.0, 5590000000.0, 5600000000.0, 5610000000.0, 5620000000.0, 5630000000.0, 5640000000.0, 5660000000.0, 5670000000.0, 5680000000.0, 5690000000.0, 5700000000.0, 5710000000.0, 5720000000.0, 5745000000.0, 5755000000.0, 5765000000.0, 5775000000.0, 5785000000.0, 5795000000.0, 5805000000.0, 5825000000.0, 5860000000.0, 5870000000.0, 5880000000.0, 5890000000.0, 5900000000.0, 5910000000.0, 5920000000.0]'
     orient: Qt.QVBoxLayout
     type: real
     value: '5920000000'
@@ -152,7 +125,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [792, 32.0]
+    coordinate:
+    - 792
+    - 32.0
     rotation: 0
     state: enabled
 - name: lo_offset
@@ -182,7 +157,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [336, 24.0]
+    coordinate:
+    - 336
+    - 24.0
     rotation: 0
     state: enabled
 - name: rx_gain
@@ -203,7 +180,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1312, 24.0]
+    coordinate:
+    - 1312
+    - 24.0
     rotation: 0
     state: enabled
 - name: samp_rate
@@ -215,7 +194,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [200, 12]
+    coordinate:
+    - 200
+    - 12
     rotation: 0
     state: disabled
 - name: samp_rate
@@ -245,7 +226,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [968, 40.0]
+    coordinate:
+    - 968
+    - 40.0
     rotation: 0
     state: enabled
 - name: samp_rate_zig
@@ -275,7 +258,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1496, 232.0]
+    coordinate:
+    - 1496
+    - 232.0
     rotation: 0
     state: enabled
 - name: tx_gain
@@ -296,7 +281,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1160, 40.0]
+    coordinate:
+    - 1160
+    - 40.0
     rotation: 0
     state: enabled
 - name: tx_gain_zig
@@ -317,7 +304,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1512, 56.0]
+    coordinate:
+    - 1512
+    - 56.0
     rotation: 0
     state: enabled
 - name: blocks_message_debug_0
@@ -332,7 +321,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [128, 304.0]
+    coordinate:
+    - 128
+    - 304.0
     rotation: 0
     state: disabled
 - name: blocks_message_debug_1
@@ -347,7 +338,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [424, 680.0]
+    coordinate:
+    - 424
+    - 680.0
     rotation: 0
     state: disabled
 - name: blocks_message_strobe_0
@@ -359,12 +352,14 @@ blocks:
     maxoutbuf: '0'
     minoutbuf: '0'
     msg: pmt.intern("TEST")
-    period: '100'
+    period: int(1000.0/pkt_rate)
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [216, 232.0]
+    coordinate:
+    - 216
+    - 232.0
     rotation: 0
     state: enabled
 - name: blocks_multiply_const_vxx_0
@@ -382,65 +377,47 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [336.0, 760]
+    coordinate:
+    - 336.0
+    - 760
     rotation: 270
     state: disabled
 - name: convert_ascii
   id: epy_block
   parameters:
-    _source_code: "import pmt\nimport numpy as np\nfrom gnuradio import gr\nclass\
-      \ blk(gr.basic_block):\n    def __init__(self):\n        gr.basic_block.__init__(self,\
-      \ name=\"pdu_to_text\", in_sig=None, out_sig=None)\n        self.message_port_register_in(pmt.intern(\"\
-      in\"))\n        self.set_msg_handler(pmt.intern(\"in\"), self.handle)\n    \
-      \    self.message_port_register_out(pmt.intern(\"out\"))\n\n    def handle(self,\
-      \ msg):\n        # msg is a PDU: (meta . u8vector)\n        meta = pmt.car(msg)\n\
-      \        vec  = pmt.cdr(msg)\n\n        # convert u8vector -> Python bytes\n\
-      \        data = bytes(pmt.u8vector_elements(vec))\n\n        # try decode as\
-      \ UTF-8/ASCII\n        try:\n            text = data.decode(\"utf-8\", errors=\"\
-      replace\")\n        except Exception:\n            text = str(data)\n\n    \
-      \    print(\"RX TEXT:\", text)\n        self.message_port_pub(pmt.intern(\"\
-      out\"), msg)\n"
+    _source_code: "import pmt\nimport numpy as np\nfrom gnuradio import gr\nclass blk(gr.basic_block):\n    def __init__(self):\n        gr.basic_block.__init__(self, name=\"pdu_to_text\", in_sig=None, out_sig=None)\n        self.message_port_register_in(pmt.intern(\"in\"))\n        self.set_msg_handler(pmt.intern(\"in\"), self.handle)\n        self.message_port_register_out(pmt.intern(\"out\"))\n\n    def handle(self, msg):\n        # msg is a PDU: (meta . u8vector)\n        meta = pmt.car(msg)\n        vec  = pmt.cdr(msg)\n\n        # convert u8vector -> Python bytes\n        data = bytes(pmt.u8vector_elements(vec))\n\n        # try decode as UTF-8/ASCII\n        try:\n            text = data.decode(\"utf-8\", errors=\"replace\")\n        except Exception:\n            text = str(data)\n\n        print(\"RX TEXT:\", text)\n        self.message_port_pub(pmt.intern(\"out\"), msg)\n"
     affinity: ''
     alias: ''
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
   states:
-    _io_cache: ('pdu_to_text', 'blk', [], [('in', 'message', 1)], [('out', 'message',
-      1)], '', [])
+    _io_cache: ('pdu_to_text', 'blk', [], [('in', 'message', 1)], [('out', 'message', 1)], '', [])
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1528, 1104.0]
+    coordinate:
+    - 1528
+    - 1104.0
     rotation: 0
     state: disabled
 - name: convert_ascii_0
   id: epy_block
   parameters:
-    _source_code: "import pmt\nimport numpy as np\nfrom gnuradio import gr\nclass\
-      \ blk(gr.basic_block):\n    def __init__(self):\n        gr.basic_block.__init__(self,\
-      \ name=\"pdu_to_text\", in_sig=None, out_sig=None)\n        self.message_port_register_in(pmt.intern(\"\
-      in\"))\n        self.set_msg_handler(pmt.intern(\"in\"), self.handle)\n    \
-      \    self.message_port_register_out(pmt.intern(\"out\"))\n\n    def handle(self,\
-      \ msg):\n        # msg is a PDU: (meta . u8vector)\n        meta = pmt.car(msg)\n\
-      \        vec  = pmt.cdr(msg)\n\n        # convert u8vector -> Python bytes\n\
-      \        data = bytes(pmt.u8vector_elements(vec))\n\n        # try decode as\
-      \ UTF-8/ASCII\n        try:\n            text = data.decode(\"utf-8\", errors=\"\
-      replace\")\n        except Exception:\n            text = str(data)\n\n    \
-      \    print(\"RX TEXT:\", text)\n        self.message_port_pub(pmt.intern(\"\
-      out\"), msg)\n"
+    _source_code: "import pmt\nimport numpy as np\nfrom gnuradio import gr\nclass blk(gr.basic_block):\n    def __init__(self):\n        gr.basic_block.__init__(self, name=\"pdu_to_text\", in_sig=None, out_sig=None)\n        self.message_port_register_in(pmt.intern(\"in\"))\n        self.set_msg_handler(pmt.intern(\"in\"), self.handle)\n        self.message_port_register_out(pmt.intern(\"out\"))\n\n    def handle(self, msg):\n        # msg is a PDU: (meta . u8vector)\n        meta = pmt.car(msg)\n        vec  = pmt.cdr(msg)\n\n        # convert u8vector -> Python bytes\n        data = bytes(pmt.u8vector_elements(vec))\n\n        # try decode as UTF-8/ASCII\n        try:\n            text = data.decode(\"utf-8\", errors=\"replace\")\n        except Exception:\n            text = str(data)\n\n        print(\"RX TEXT:\", text)\n        self.message_port_pub(pmt.intern(\"out\"), msg)\n"
     affinity: ''
     alias: ''
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
   states:
-    _io_cache: ('pdu_to_text', 'blk', [], [('in', 'message', 1)], [('out', 'message',
-      1)], '', [])
+    _io_cache: ('pdu_to_text', 'blk', [], [('in', 'message', 1)], [('out', 'message', 1)], '', [])
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [376, 424.0]
+    coordinate:
+    - 376
+    - 424.0
     rotation: 0
     state: enabled
 - name: digital_crc16_async_bb_0
@@ -456,7 +433,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1160, 288.0]
+    coordinate:
+    - 1160
+    - 288.0
     rotation: 0
     state: enabled
 - name: digital_crc16_async_bb_1
@@ -472,7 +451,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1440, 816.0]
+    coordinate:
+    - 1440
+    - 816.0
     rotation: 0
     state: enabled
 - name: digital_crc32_async_bb_0
@@ -488,7 +469,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [984, 624.0]
+    coordinate:
+    - 984
+    - 624.0
     rotation: 0
     state: enabled
 - name: foo_packet_pad2_0
@@ -508,7 +491,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [584, 912.0]
+    coordinate:
+    - 584
+    - 912.0
     rotation: 0
     state: disabled
 - name: foo_packet_pad2_1
@@ -528,7 +513,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1184, 776.0]
+    coordinate:
+    - 1184
+    - 776.0
     rotation: 180
     state: disabled
 - name: ieee802_15_4_oqpsk_phy_0
@@ -543,9 +530,11 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1296, 552.0]
+    coordinate:
+    - 1296
+    - 552.0
     rotation: 0
-    state: disabled
+    state: enabled
 - name: pdu_add_system_time_0
   id: pdu_add_system_time
   parameters:
@@ -559,7 +548,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [896, 256.0]
+    coordinate:
+    - 896
+    - 256.0
     rotation: 0
     state: disabled
 - name: pdu_pdu_to_tagged_stream_0
@@ -576,7 +567,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [296.0, 576]
+    coordinate:
+    - 296.0
+    - 576
     rotation: 270
     state: disabled
 - name: qtgui_const_sink_x_0
@@ -668,7 +661,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [104, 584.0]
+    coordinate:
+    - 104
+    - 584.0
     rotation: 0
     state: disabled
 - name: qtgui_time_sink_x_0
@@ -765,173 +760,72 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [408, 736.0]
+    coordinate:
+    - 520
+    - 776.0
     rotation: 0
     state: disabled
 - name: seq_input
   id: epy_block
   parameters:
-    _source_code: "from gnuradio import gr\nimport pmt\nimport time\n\n\nclass blk(gr.basic_block):\n\
-      \    def __init__(self):\n        gr.basic_block.__init__(self, name=\"seq_pdu\"\
-      , in_sig=None, out_sig=None)\n\n        self.message_port_register_in(pmt.intern(\"\
-      in\"))\n        self.set_msg_handler(pmt.intern(\"in\"), self.handle_trigger)\n\
-      \        self.message_port_register_in(pmt.intern(\"feedback\"))\n        self.set_msg_handler(pmt.intern(\"\
-      feedback\"), self.handle_feedback)\n        self.message_port_register_out(pmt.intern(\"\
-      out\"))\n\n        self.max_seq = 1000000\n        self.seq = 0\n        self.current_payload\
-      \ = None  # current_payload will set after first message from in port\n    \
-      \    self.stopped = False\n        self.total_tx_count = 0\n        self.ack_count\
-      \ = 0\n        self.nack_count = 0\n        self.tx_payload_bytes = 0\n    \
-      \    self.acked_payload_bytes = 0\n        self.start_time = None\n        self.end_time\
-      \ = None\n        self.stats_filename = \"seq_pdu_stats.txt\"\n\n    def handle_trigger(self,\
-      \ msg):\n        if self.stopped or self.current_payload is not None:\n    \
-      \        return\n\n        self.seq += 1\n        self.current_payload = self.build_payload(self.seq)\n\
-      \        self.publish_current_payload()\n\n    def handle_feedback(self, msg):\n\
-      \        if self.current_payload is None:\n            return\n\n        if\
-      \ not pmt.is_symbol(msg):\n            return\n\n        feedback = pmt.symbol_to_string(msg)\n\
-      \n        if feedback == \"ack\":\n            self.ack_count += 1\n       \
-      \     self.acked_payload_bytes += len(self.current_payload)\n            if\
-      \ self.seq >= self.max_seq:\n                self.current_payload = None\n \
-      \               self.stopped = True\n                self.end_time = time.monotonic()\n\
-      \                self.write_stats()\n                return\n            self.seq\
-      \ += 1\n            self.current_payload = self.build_payload(self.seq)\n  \
-      \          self.publish_current_payload()\n        elif feedback == \"nack\"\
-      :\n            self.nack_count += 1\n            self.publish_current_payload()\n\
-      \n    def build_payload(self, seq):\n        return f\"{seq:06d} HELLO WORLD\"\
-      .encode()\n\n    def publish_current_payload(self):\n        if self.start_time\
-      \ is None:\n            self.start_time = time.monotonic()\n\n        payload\
-      \ = pmt.init_u8vector(len(self.current_payload), list(self.current_payload))\n\
-      \        pdu = pmt.cons(pmt.make_dict(), payload)\n        self.message_port_pub(pmt.intern(\"\
-      out\"), pdu)\n\n        self.total_tx_count += 1\n        self.tx_payload_bytes\
-      \ += len(self.current_payload)\n        self.write_stats()\n\n    def write_stats(self):\n\
-      \        now = self.end_time if self.end_time is not None else time.monotonic()\n\
-      \        elapsed_seconds = 0.0 if self.start_time is None else now - self.start_time\n\
-      \        throughput_bps = (\n            self.acked_payload_bytes * 8 / elapsed_seconds\n\
-      \            if elapsed_seconds > 0\n            else 0.0\n        )\n     \
-      \   # tx_rate_bps = (\n        #     self.tx_payload_bytes * 8 / elapsed_seconds\n\
-      \        #     if elapsed_seconds > 0\n        #     else 0.0\n        # )\n\
-      \n        with open(self.stats_filename, \"w\", encoding=\"ascii\") as stats_file:\n\
-      \            stats_file.write(f\"current_seq={self.seq:06d}\\n\")\n        \
-      \    stats_file.write(f\"max_seq={self.max_seq:06d}\\n\")\n            stats_file.write(f\"\
-      stopped={int(self.stopped)}\\n\")\n            stats_file.write(f\"total_tx_count={self.total_tx_count}\\\
-      n\")\n            stats_file.write(f\"ack_count={self.ack_count}\\n\")\n   \
-      \         stats_file.write(f\"nack_count={self.nack_count}\\n\")\n         \
-      \   stats_file.write(f\"tx_payload_bytes={self.tx_payload_bytes}\\n\")\n   \
-      \         stats_file.write(f\"acked_payload_bytes={self.acked_payload_bytes}\\\
-      n\")\n            stats_file.write(f\"elapsed_seconds={elapsed_seconds:.6f}\\\
-      n\")\n            stats_file.write(f\"throughput_bps={throughput_bps:.3f}\\\
-      n\")\n            # stats_file.write(f\"tx_rate_bps={tx_rate_bps:.3f}\\n\")\n"
+    _source_code: "from gnuradio import gr\nimport pmt\nimport time\n\n\nclass blk(gr.basic_block):\n    def __init__(self):\n        gr.basic_block.__init__(self, name=\"seq_pdu\", in_sig=None, out_sig=None)\n\n        self.message_port_register_in(pmt.intern(\"in\"))\n        self.set_msg_handler(pmt.intern(\"in\"), self.handle_trigger)\n        self.message_port_register_out(pmt.intern(\"out\"))\n\n        # Fixed payload, sent identically on every trigger. No ACK/NACK and no\n        # sequence increment: this flowgraph only verifies that the recovery\n        # algorithm decodes the packet, so one constant known payload is enough.\n        # Keep the original payload format (\"NNNNNN TEXT\").\n        self.payload = b\"000001 HELLO WORLD\"\n        self.total_tx_count = 0\n        self.start_time = None\n        self.stats_filename = \"seq_pdu_stats.txt\"\n\n    def handle_trigger(self, msg):\n        if self.start_time is None:\n            self.start_time = time.monotonic()\n\n        payload = pmt.init_u8vector(len(self.payload), list(self.payload))\n        pdu = pmt.cons(pmt.make_dict(), payload)\n        self.message_port_pub(pmt.intern(\"out\"), pdu)\n\n        self.total_tx_count += 1\n        self.write_stats()\n\n    def write_stats(self):\n        elapsed = 0.0 if self.start_time is None else time.monotonic() - self.start_time\n        with open(self.stats_filename, \"w\", encoding=\"ascii\") as f:\n            f.write(f\"payload={self.payload.decode('ascii')}\\n\")\n            f.write(f\"total_tx_count={self.total_tx_count}\\n\")\n            f.write(f\"elapsed_seconds={elapsed:.6f}\\n\")\n"
     affinity: ''
     alias: ''
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
   states:
-    _io_cache: ('seq_pdu', 'blk', [], [('feedback', 'message', 1), ('in', 'message',
-      1)], [('out', 'message', 1)], '', [])
+    _io_cache: ('seq_pdu', 'blk', [], [('in', 'message', 1)], [('out', 'message', 1)], '', [])
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [560, 256.0]
+    coordinate:
+    - 560
+    - 256.0
     rotation: 0
     state: enabled
 - name: tx_time_tagger_0
   id: epy_block
   parameters:
-    _source_code: "import numpy as np\nfrom gnuradio import gr\nimport pmt\nimport\
-      \ sys\nimport types\nimport time\nimport threading\n\n# --- Timed-burst TX for\
-      \ synchronized WiFi + ZigBee --------------------------\n# Both radios share\
-      \ 10 MHz + PPS and are synced \"PC Clock on Next PPS\", so\n# their clocks are\
-      \ mutually identical and track host time (measured offset is\n# only a fraction\
-      \ of a second, in the safe direction). This block stamps an\n# absolute \"tx_time\"\
-      \ on the first sample of each packet_len burst so the radio\n# fires it at an\
-      \ exact instant. A WiFi packet and its ZigBee twin come from one\n# PDU, so\
-      \ a tiny process-wide coincidence scheduler hands both the SAME tx_time\n# ->\
-      \ the two radios transmit together.\n#\n# Keep LEAD SMALL: it only needs to\
-      \ cover host->FPGA latency. A large LEAD\n# queues many timed bursts inside\
-      \ the radio and overruns its command buffer\n# (that was the cause of the 'L'/cmd-time-error\
-      \ flood). LEAD and WINDOW must be\n# identical in BOTH tagger blocks.\nLEAD\
-      \ = 0.15     # seconds ahead of \"now\" to schedule each burst\nWINDOW = 0.03\
-      \  # max skew between the WiFi and ZigBee burst of one packet\n\n_MOD = \"_txsync_shared\"\
-      \nif _MOD in sys.modules:\n    _sh = sys.modules[_MOD]\nelse:\n    _sh = types.ModuleType(_MOD)\n\
-      \    _sh.lock = threading.Lock()\n    _sh.tx_time = None\n    _sh.claims = 0\n\
-      \    _sh.stamp = 0.0\n    sys.modules[_MOD] = _sh\n\n\ndef _next_tx_time():\n\
-      \    with _sh.lock:\n        now = time.time()\n        if (_sh.tx_time is not\
-      \ None and _sh.claims < 2\n                and (now - _sh.stamp) < WINDOW):\n\
-      \            _sh.claims += 1\n            return _sh.tx_time\n        t = now\
-      \ + LEAD\n        _sh.tx_time = t\n        _sh.claims = 1\n        _sh.stamp\
-      \ = now\n        return t\n\n\nclass blk(gr.sync_block):\n    def __init__(self):\n\
-      \        gr.sync_block.__init__(self, name=\"tx_time_tagger\",\n           \
-      \                    in_sig=[np.complex64], out_sig=[np.complex64])\n      \
-      \  self.len_key = pmt.intern(\"packet_len\")\n        self.time_key = pmt.intern(\"\
-      tx_time\")\n\n    def work(self, input_items, output_items):\n        n = len(input_items[0])\n\
-      \        output_items[0][:] = input_items[0]\n        for tg in self.get_tags_in_window(0,\
-      \ 0, n, self.len_key):\n            t = _next_tx_time()\n            full =\
-      \ int(t)\n            frac = float(t - full)\n            val = pmt.make_tuple(pmt.from_uint64(full),\
-      \ pmt.from_double(frac))\n            self.add_item_tag(0, tg.offset, self.time_key,\
-      \ val)\n        return n\n"
+    _source_code: "import numpy as np\nfrom gnuradio import gr\nimport pmt\nimport sys\nimport types\nimport time\nimport threading\n\n# Timed-burst TX: stamp an absolute tx_time on the first sample of each\n# packet_len burst so the radio fires it at an exact instant. A process-wide\n# coincidence scheduler hands the WiFi burst and its ZigBee twin the SAME\n# tx_time so the two radios transmit together. LEAD/WINDOW now come in as\n# block parameters (set them from the tx_lead / tx_window variables); they\n# MUST be identical in both tagger instances.\n_MOD = \"_txsync_shared\"\nif _MOD in sys.modules:\n    _sh = sys.modules[_MOD]\nelse:\n    _sh = types.ModuleType(_MOD)\n    _sh.lock = threading.Lock()\n    _sh.tx_time = None\n    _sh.claims = 0\n    _sh.stamp = 0.0\n    sys.modules[_MOD] = _sh\n\n\ndef _next_tx_time(lead, window):\n    with _sh.lock:\n        now = time.time()\n        if (_sh.tx_time is not None and _sh.claims < 2\n                and (now - _sh.stamp) < window):\n            _sh.claims += 1\n            return _sh.tx_time\n        t = now + lead\n        _sh.tx_time = t\n        _sh.claims = 1\n        _sh.stamp = now\n        return t\n\n\nclass blk(gr.sync_block):\n    def __init__(self, lead=0.05, window=0.06):\n        gr.sync_block.__init__(self, name=\"tx_time_tagger\",\n                               in_sig=[np.complex64], out_sig=[np.complex64])\n        self._lead = lead\n        self._window = window\n        self.len_key = pmt.intern(\"packet_len\")\n        self.time_key = pmt.intern(\"tx_time\")\n\n    def work(self, input_items, output_items):\n        n = len(input_items[0])\n        output_items[0][:] = input_items[0]\n        for tg in self.get_tags_in_window(0, 0, n, self.len_key):\n            t = _next_tx_time(self._lead, self._window)\n            full = int(t)\n            frac = float(t - full)\n            val = pmt.make_tuple(pmt.from_uint64(full), pmt.from_double(frac))\n            self.add_item_tag(0, tg.offset, self.time_key, val)\n        return n\n"
     affinity: ''
     alias: ''
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
+    lead: tx_lead
+    window: tx_window
   states:
-    _io_cache: ('tx_time_tagger', 'blk', [], [('0', 'complex', 1)], [('0', 'complex',
-      1)], '', [])
+    _io_cache: ('tx_time_tagger', 'blk', [('lead', '0.05'), ('window', '0.06')], [('0', 'complex', 1)], [('0', 'complex', 1)], '', [])
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [352, 896.0]
+    coordinate:
+    - 536
+    - 608.0
     rotation: 0
     state: enabled
 - name: tx_time_tagger_1
   id: epy_block
   parameters:
-    _source_code: "import numpy as np\nfrom gnuradio import gr\nimport pmt\nimport\
-      \ sys\nimport types\nimport time\nimport threading\n\n# --- Timed-burst TX for\
-      \ synchronized WiFi + ZigBee --------------------------\n# Both radios share\
-      \ 10 MHz + PPS and are synced \"PC Clock on Next PPS\", so\n# their clocks are\
-      \ mutually identical and track host time (measured offset is\n# only a fraction\
-      \ of a second, in the safe direction). This block stamps an\n# absolute \"tx_time\"\
-      \ on the first sample of each packet_len burst so the radio\n# fires it at an\
-      \ exact instant. A WiFi packet and its ZigBee twin come from one\n# PDU, so\
-      \ a tiny process-wide coincidence scheduler hands both the SAME tx_time\n# ->\
-      \ the two radios transmit together.\n#\n# Keep LEAD SMALL: it only needs to\
-      \ cover host->FPGA latency. A large LEAD\n# queues many timed bursts inside\
-      \ the radio and overruns its command buffer\n# (that was the cause of the 'L'/cmd-time-error\
-      \ flood). LEAD and WINDOW must be\n# identical in BOTH tagger blocks.\nLEAD\
-      \ = 0.05    # seconds ahead of \"now\" to schedule each burst\nWINDOW = 0.06\
-      \  # max skew between the WiFi and ZigBee burst of one packet\n\n_MOD = \"_txsync_shared\"\
-      \nif _MOD in sys.modules:\n    _sh = sys.modules[_MOD]\nelse:\n    _sh = types.ModuleType(_MOD)\n\
-      \    _sh.lock = threading.Lock()\n    _sh.tx_time = None\n    _sh.claims = 0\n\
-      \    _sh.stamp = 0.0\n    sys.modules[_MOD] = _sh\n\n\ndef _next_tx_time():\n\
-      \    with _sh.lock:\n        now = time.time()\n        if (_sh.tx_time is not\
-      \ None and _sh.claims < 2\n                and (now - _sh.stamp) < WINDOW):\n\
-      \            _sh.claims += 1\n            return _sh.tx_time\n        t = now\
-      \ + LEAD\n        _sh.tx_time = t\n        _sh.claims = 1\n        _sh.stamp\
-      \ = now\n        return t\n\n\nclass blk(gr.sync_block):\n    def __init__(self):\n\
-      \        gr.sync_block.__init__(self, name=\"tx_time_tagger\",\n           \
-      \                    in_sig=[np.complex64], out_sig=[np.complex64])\n      \
-      \  self.len_key = pmt.intern(\"packet_len\")\n        self.time_key = pmt.intern(\"\
-      tx_time\")\n\n    def work(self, input_items, output_items):\n        n = len(input_items[0])\n\
-      \        output_items[0][:] = input_items[0]\n        for tg in self.get_tags_in_window(0,\
-      \ 0, n, self.len_key):\n            t = _next_tx_time()\n            full =\
-      \ int(t)\n            frac = float(t - full)\n            val = pmt.make_tuple(pmt.from_uint64(full),\
-      \ pmt.from_double(frac))\n            self.add_item_tag(0, tg.offset, self.time_key,\
-      \ val)\n        return n\n"
+    _source_code: "import numpy as np\nfrom gnuradio import gr\nimport pmt\nimport sys\nimport types\nimport time\nimport threading\n\n# Timed-burst TX: stamp an absolute tx_time on the first sample of each\n# packet_len burst so the radio fires it at an exact instant. A process-wide\n# coincidence scheduler hands the WiFi burst and its ZigBee twin the SAME\n# tx_time so the two radios transmit together. LEAD/WINDOW now come in as\n# block parameters (set them from the tx_lead / tx_window variables); they\n# MUST be identical in both tagger instances.\n_MOD = \"_txsync_shared\"\nif _MOD in sys.modules:\n    _sh = sys.modules[_MOD]\nelse:\n    _sh = types.ModuleType(_MOD)\n    _sh.lock = threading.Lock()\n    _sh.tx_time = None\n    _sh.claims = 0\n    _sh.stamp = 0.0\n    sys.modules[_MOD] = _sh\n\n\ndef _next_tx_time(lead, window):\n    with _sh.lock:\n        now = time.time()\n        if (_sh.tx_time is not None and _sh.claims < 2\n                and (now - _sh.stamp) < window):\n            _sh.claims += 1\n            return _sh.tx_time\n        t = now + lead\n        _sh.tx_time = t\n        _sh.claims = 1\n        _sh.stamp = now\n        return t\n\n\nclass blk(gr.sync_block):\n    def __init__(self, lead=0.05, window=0.06):\n        gr.sync_block.__init__(self, name=\"tx_time_tagger\",\n                               in_sig=[np.complex64], out_sig=[np.complex64])\n        self._lead = lead\n        self._window = window\n        self.len_key = pmt.intern(\"packet_len\")\n        self.time_key = pmt.intern(\"tx_time\")\n\n    def work(self, input_items, output_items):\n        n = len(input_items[0])\n        output_items[0][:] = input_items[0]\n        for tg in self.get_tags_in_window(0, 0, n, self.len_key):\n            t = _next_tx_time(self._lead, self._window)\n            full = int(t)\n            frac = float(t - full)\n            val = pmt.make_tuple(pmt.from_uint64(full), pmt.from_double(frac))\n            self.add_item_tag(0, tg.offset, self.time_key, val)\n        return n\n"
     affinity: ''
     alias: ''
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
+    lead: tx_lead
+    window: tx_window
   states:
-    _io_cache: ('tx_time_tagger', 'blk', [], [('0', 'complex', 1)], [('0', 'complex',
-      1)], '', [])
+    _io_cache: ('tx_time_tagger', 'blk', [('lead', '0.05'), ('window', '0.06')], [('0', 'complex', 1)], [('0', 'complex', 1)], '', [])
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1360, 688.0]
+    coordinate:
+    - 1360
+    - 688.0
     rotation: 0
-    state: disabled
+    state: enabled
 - name: uhd_usrp_source_0
   id: uhd_usrp_source
   parameters:
@@ -1365,7 +1259,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1224, 324.0]
+    coordinate:
+    - 992
+    - 356.0
     rotation: 180
     state: enabled
 - name: uhd_usrp_source_0_0
@@ -1801,7 +1697,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1160, 844.0]
+    coordinate:
+    - 1160
+    - 844.0
     rotation: 180
     state: disabled
 - name: wifi_phy_hier_0
@@ -1821,7 +1719,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [736, 440.0]
+    coordinate:
+    - 736
+    - 440.0
     rotation: 180
     state: enabled
 - name: wifi_tx
@@ -2098,7 +1998,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [712, 716.0]
+    coordinate:
+    - 712
+    - 716.0
     rotation: 0
     state: enabled
 - name: zigbee_tx
@@ -2375,39 +2277,181 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1640, 580.0]
+    coordinate:
+    - 1608
+    - 572.0
     rotation: 0
-    state: disabled
-
+    state: enabled
+- name: pkt_rate
+  id: variable_qtgui_range
+  parameters:
+    comment: ''
+    gui_hint: ''
+    label: TX packets/sec (max=ZigBee limit)
+    min_len: '200'
+    orient: QtCore.Qt.Horizontal
+    rangeType: int
+    start: '1'
+    step: '1'
+    stop: max_pkt_rate
+    value: '1'
+    widget: counter_slider
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate:
+    - 216
+    - 120.0
+    rotation: 0
+    state: enabled
+- name: max_pkt_rate
+  id: variable
+  parameters:
+    comment: 'ZigBee-limited: samp_rate_zig / zigbee_frame_samples(3336)'
+    value: int(samp_rate_zig/3336)
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate:
+    - 400
+    - 12.0
+    rotation: 0
+    state: enabled
+- name: tx_lead
+  id: variable
+  parameters:
+    comment: ''
+    value: '0.05'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate:
+    - 600
+    - 20.0
+    rotation: 0
+    state: enabled
+- name: tx_window
+  id: variable
+  parameters:
+    comment: ''
+    value: '0.06'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate:
+    - 600
+    - 84.0
+    rotation: 0
+    state: enabled
 connections:
-- [blocks_message_strobe_0, strobe, seq_input, in]
-- [blocks_multiply_const_vxx_0, '0', foo_packet_pad2_0, '0']
-- [digital_crc16_async_bb_0, out, ieee802_15_4_oqpsk_phy_0, txin]
-- [digital_crc16_async_bb_1, out, convert_ascii, in]
-- [digital_crc32_async_bb_0, out, wifi_phy_hier_0, mac_in]
-- [foo_packet_pad2_0, '0', wifi_phy_hier_0, '0']
-- [foo_packet_pad2_1, '0', tx_time_tagger_1, '0']
-- [ieee802_15_4_oqpsk_phy_0, '0', foo_packet_pad2_1, '0']
-- [ieee802_15_4_oqpsk_phy_0, '0', tx_time_tagger_1, '0']
-- [ieee802_15_4_oqpsk_phy_0, rxout, digital_crc16_async_bb_1, in]
-- [pdu_add_system_time_0, pdu, digital_crc16_async_bb_0, in]
-- [pdu_add_system_time_0, pdu, digital_crc32_async_bb_0, in]
-- [pdu_pdu_to_tagged_stream_0, '0', qtgui_const_sink_x_0, '0']
-- [seq_input, out, digital_crc16_async_bb_0, in]
-- [seq_input, out, digital_crc32_async_bb_0, in]
-- [seq_input, out, pdu_add_system_time_0, pdu]
-- [tx_time_tagger_0, '0', wifi_tx, '0']
-- [tx_time_tagger_1, '0', zigbee_tx, '0']
-- [uhd_usrp_source_0, '0', ieee802_15_4_oqpsk_phy_0, '0']
-- [uhd_usrp_source_0, '0', wifi_phy_hier_0, '0']
-- [wifi_phy_hier_0, '0', blocks_multiply_const_vxx_0, '0']
-- [wifi_phy_hier_0, '0', qtgui_time_sink_x_0, '0']
-- [wifi_phy_hier_0, '0', tx_time_tagger_0, '0']
-- [wifi_phy_hier_0, mac_out, blocks_message_debug_0, print]
-- [wifi_phy_hier_0, mac_out, convert_ascii_0, in]
-- [wifi_phy_hier_0, tx_feedback, blocks_message_debug_1, print]
-- [wifi_phy_hier_0, tx_feedback, seq_input, feedback]
-
+- - blocks_message_strobe_0
+  - strobe
+  - seq_input
+  - in
+- - blocks_multiply_const_vxx_0
+  - '0'
+  - foo_packet_pad2_0
+  - '0'
+- - digital_crc16_async_bb_0
+  - out
+  - ieee802_15_4_oqpsk_phy_0
+  - txin
+- - digital_crc16_async_bb_1
+  - out
+  - convert_ascii
+  - in
+- - digital_crc32_async_bb_0
+  - out
+  - wifi_phy_hier_0
+  - mac_in
+- - foo_packet_pad2_0
+  - '0'
+  - wifi_phy_hier_0
+  - '0'
+- - foo_packet_pad2_1
+  - '0'
+  - tx_time_tagger_1
+  - '0'
+- - ieee802_15_4_oqpsk_phy_0
+  - '0'
+  - foo_packet_pad2_1
+  - '0'
+- - ieee802_15_4_oqpsk_phy_0
+  - '0'
+  - tx_time_tagger_1
+  - '0'
+- - ieee802_15_4_oqpsk_phy_0
+  - rxout
+  - digital_crc16_async_bb_1
+  - in
+- - pdu_add_system_time_0
+  - pdu
+  - digital_crc16_async_bb_0
+  - in
+- - pdu_add_system_time_0
+  - pdu
+  - digital_crc32_async_bb_0
+  - in
+- - pdu_pdu_to_tagged_stream_0
+  - '0'
+  - qtgui_const_sink_x_0
+  - '0'
+- - seq_input
+  - out
+  - digital_crc16_async_bb_0
+  - in
+- - seq_input
+  - out
+  - digital_crc32_async_bb_0
+  - in
+- - seq_input
+  - out
+  - pdu_add_system_time_0
+  - pdu
+- - tx_time_tagger_0
+  - '0'
+  - wifi_tx
+  - '0'
+- - tx_time_tagger_1
+  - '0'
+  - zigbee_tx
+  - '0'
+- - uhd_usrp_source_0
+  - '0'
+  - ieee802_15_4_oqpsk_phy_0
+  - '0'
+- - uhd_usrp_source_0
+  - '0'
+  - wifi_phy_hier_0
+  - '0'
+- - wifi_phy_hier_0
+  - '0'
+  - blocks_multiply_const_vxx_0
+  - '0'
+- - wifi_phy_hier_0
+  - '0'
+  - qtgui_time_sink_x_0
+  - '0'
+- - wifi_phy_hier_0
+  - '0'
+  - tx_time_tagger_0
+  - '0'
+- - wifi_phy_hier_0
+  - mac_out
+  - blocks_message_debug_0
+  - print
+- - wifi_phy_hier_0
+  - mac_out
+  - convert_ascii_0
+  - in
+- - wifi_phy_hier_0
+  - tx_feedback
+  - blocks_message_debug_1
+  - print
 metadata:
   file_format: 1
   grc_version: v3.11.0.0git-843-g6b25c171
