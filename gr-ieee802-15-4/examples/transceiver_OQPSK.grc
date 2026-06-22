@@ -234,7 +234,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [416, 680.0]
+    coordinate: [416, 904.0]
     rotation: 0
     state: enabled
 - name: digital_crc16_async_bb_1
@@ -250,7 +250,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [904, 624.0]
+    coordinate: [960, 784.0]
     rotation: 0
     state: enabled
 - name: digital_crc32_bb_0
@@ -351,7 +351,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [352, 304.0]
+    coordinate: [152, 376.0]
     rotation: 0
     state: enabled
 - name: foo_packet_pad2_0
@@ -424,7 +424,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [600, 584.0]
+    coordinate: [600, 616.0]
     rotation: 0
     state: enabled
 - name: ieee802_15_4_rime_stack_0
@@ -443,7 +443,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [392, 248.0]
+    coordinate: [472, 264.0]
     rotation: 0
     state: disabled
 - name: note_0
@@ -457,7 +457,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [112, 552.0]
+    coordinate: [616, 40.0]
     rotation: 0
     state: enabled
 - name: note_1
@@ -933,7 +933,7 @@ blocks:
     nchan: '1'
     num_mboards: '1'
     otw: ''
-    samp_rate: '2000000'
+    samp_rate: '200000'
     sd_spec0: ''
     sd_spec1: ''
     sd_spec2: ''
@@ -1369,7 +1369,7 @@ blocks:
     rx_agc7: Default
     rx_agc8: Default
     rx_agc9: Default
-    samp_rate: '2000000'
+    samp_rate: '200000'
     sd_spec0: ''
     sd_spec1: ''
     sd_spec2: ''
@@ -1396,7 +1396,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [176, 508.0]
+    coordinate: [240, 612.0]
     rotation: 0
     state: enabled
 

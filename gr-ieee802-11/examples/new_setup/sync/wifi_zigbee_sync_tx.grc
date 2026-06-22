@@ -519,7 +519,7 @@ blocks:
     bus_structure: null
     coordinate: [1440, 816.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: digital_crc32_async_bb_0
   id: digital_crc32_async_bb
   parameters:
@@ -2014,7 +2014,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [992, 356.0]
+    coordinate: [968, 460.0]
     rotation: 180
     state: enabled
 - name: wifi_phy_hier_0
@@ -2311,7 +2311,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [448, 748.0]
+    coordinate: [600, 660.0]
     rotation: 0
     state: enabled
 - name: zigbee_tx
