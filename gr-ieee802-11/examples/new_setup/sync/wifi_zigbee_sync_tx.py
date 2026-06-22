@@ -323,13 +323,6 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
         self.uhd_usrp_source_0.set_normalized_gain(rx_gain, 0)
         self.tx_time_tagger_1 = tx_time_tagger_1.blk(lead=tx_lead, window=tx_window)
         self.tx_time_tagger_0 = tx_time_tagger_0.blk(lead=tx_lead, window=tx_window)
-        # Schedule timed bursts against the radio's own clock (PPS/external
-        # reference) instead of the host wall clock, so tx_time never drifts
-        # out from under the USRP. Both taggers share one clock domain, so
-        # registering it once (via the shared _txsync_shared module) covers
-        # both. wifi_tx and zigbee_tx are locked to the same external reference.
-        self.tx_time_tagger_0.set_time_source(
-            lambda: self.wifi_tx.get_time_now().get_real_secs())
         self.seq_input = seq_input.blk()
         self.ieee802_15_4_oqpsk_phy_0 = ieee802_15_4_oqpsk_phy()
         self.digital_crc32_async_bb_0 = digital.crc32_async_bb(False)
@@ -476,6 +469,13 @@ def main(top_block_cls=wifi_zigbee_sync_tx, options=None):
     qapp = Qt.QApplication(sys.argv)
 
     tb = top_block_cls()
+
+    # Schedule timed bursts against the radio clock, not host wall time, so
+    # tx_time never drifts out from under the USRP (avoids the "cmd time
+    # error" / Late-burst flood). Mirrors the tx_clock_bind GRC snippet so a
+    # regeneration keeps this behavior; harmless if run twice.
+    tb.tx_time_tagger_0.set_time_source(
+        lambda: tb.wifi_tx.get_time_now().get_real_secs())
 
     tb.start()
     tb.flowgraph_started.set()

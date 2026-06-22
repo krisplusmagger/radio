@@ -2349,6 +2349,21 @@ blocks:
     coordinate: [1608, 572.0]
     rotation: 0
     state: enabled
+- name: tx_clock_bind
+  id: snippet
+  parameters:
+    alias: ''
+    code: "self.tx_time_tagger_0.set_time_source(lambda: self.wifi_tx.get_time_now().get_real_secs())"
+    comment: ''
+    priority: '0'
+    section: main_after_init
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1608, 700.0]
+    rotation: 0
+    state: enabled
 
 connections:
 - [blocks_message_strobe_0, strobe, seq_input, in]
