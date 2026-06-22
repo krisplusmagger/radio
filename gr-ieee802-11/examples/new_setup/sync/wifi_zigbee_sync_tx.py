@@ -116,7 +116,7 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
         ##################################################
         self.samp_rate_zig = samp_rate_zig = 2e5
         self.tx_window = tx_window = 0.06
-        self.tx_lead = tx_lead = 0.05
+        self.tx_lead = tx_lead = 0.25
         self.tx_gain_zig = tx_gain_zig = 1
         self.tx_gain = tx_gain = 0.8
         self.samp_rate = samp_rate = 2e6
