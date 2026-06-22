@@ -458,7 +458,7 @@ blocks:
     bus_structure: null
     coordinate: [1528, 1104.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: convert_ascii_0
   id: epy_block
   parameters:
@@ -485,9 +485,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [376, 424.0]
+    coordinate: [320, 432.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: digital_crc16_async_bb_0
   id: digital_crc16_async_bb
   parameters:
@@ -501,9 +501,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1160, 288.0]
+    coordinate: [1112, 312.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: digital_crc16_async_bb_1
   id: digital_crc16_async_bb
   parameters:
@@ -517,9 +517,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1440, 816.0]
+    coordinate: [1440, 840.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: digital_crc32_async_bb_0
   id: digital_crc32_async_bb
   parameters:
@@ -535,7 +535,7 @@ blocks:
     bus_structure: null
     coordinate: [984, 624.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: foo_packet_pad2_0
   id: foo_packet_pad2
   parameters:
@@ -1024,7 +1024,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1296, 552.0]
+    coordinate: [1368, 392.0]
     rotation: 0
     state: enabled
 - name: pdu_add_system_time_0
@@ -1405,28 +1405,21 @@ blocks:
   id: snippet
   parameters:
     alias: ''
-    code: 'self.tx_time_tagger_0.set_time_source(lambda: self.wifi_tx.get_time_now().get_real_secs())
-
-      self.tx_time_tagger_0.set_schedule(int(1000.0/self.pkt_rate)/1000.0, 1.0)
-
-      # Shrink oversized 65536-sample ZigBee TX buffers (latency/memory only; the
-      schedule no longer depends on it).
-
-      self.ieee802_15_4_oqpsk_phy_0.blocks_float_to_complex_0.set_min_output_buffer(2**13)
-
-      self.ieee802_15_4_oqpsk_phy_0.blocks_tagged_stream_multiply_length_0.set_min_output_buffer(2**13)
-
-      self.ieee802_15_4_oqpsk_phy_0.foo_packet_pad2_0.set_min_output_buffer(2**13)
-
-      self.top_layout.removeWidget(self._qtgui_sink_x_0_win)
-
-      self._qtgui_sink_x_0_win.setParent(None)
-
-      self._qtgui_sink_x_0_win.setWindowTitle("Spectrum / Waterfall")
-
-      self._qtgui_sink_x_0_win.resize(1400, 700)
-
-      self._qtgui_sink_x_0_win.show()'
+    code: |
+      _r = getattr(self, "wifi_tx", None) or getattr(self, "zigbee_tx", None)
+      _t = getattr(self, "tx_time_tagger_0", None) or getattr(self, "tx_time_tagger_1", None)
+      _t and _r and _t.set_time_source(lambda: _r.get_time_now().get_real_secs())
+      _t and _t.set_schedule(int(1000.0/self.pkt_rate)/1000.0, 1.0)
+      _q = getattr(self, "ieee802_15_4_oqpsk_phy_0", None)
+      _q and _q.blocks_float_to_complex_0.set_min_output_buffer(2**13)
+      _q and _q.blocks_tagged_stream_multiply_length_0.set_min_output_buffer(2**13)
+      _q and _q.foo_packet_pad2_0.set_min_output_buffer(2**13)
+      _w = getattr(self, "_qtgui_sink_x_0_win", None)
+      _w and self.top_layout.removeWidget(_w)
+      _w and _w.setParent(None)
+      _w and _w.setWindowTitle("Spectrum / Waterfall")
+      _w and _w.resize(1400, 700)
+      _w and _w.show()
     comment: ''
     priority: '0'
     section: main_after_init
@@ -1508,7 +1501,7 @@ blocks:
     bus_structure: null
     coordinate: [496, 552.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: tx_time_tagger_1
   id: epy_block
   parameters:
@@ -1578,7 +1571,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1360, 688.0]
+    coordinate: [1464, 656.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_source_0
@@ -2014,7 +2007,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [968, 460.0]
+    coordinate: [1184, 524.0]
     rotation: 180
     state: enabled
 - name: wifi_phy_hier_0
@@ -2036,7 +2029,7 @@ blocks:
     bus_structure: null
     coordinate: [736, 440.0]
     rotation: 180
-    state: enabled
+    state: disabled
 - name: wifi_tx
   id: uhd_usrp_sink
   parameters:
@@ -2313,7 +2306,7 @@ blocks:
     bus_structure: null
     coordinate: [600, 660.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: zigbee_tx
   id: uhd_usrp_sink
   parameters:
@@ -2588,7 +2581,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1696, 628.0]
+    coordinate: [1696, 660.0]
     rotation: 0
     state: enabled
 
@@ -2610,7 +2603,6 @@ connections:
 - [pdu_pdu_to_tagged_stream_0, '0', qtgui_const_sink_x_0, '0']
 - [seq_input, out, digital_crc16_async_bb_0, in]
 - [seq_input, out, digital_crc32_async_bb_0, in]
-- [seq_input, out, ieee802_15_4_oqpsk_phy_0, txin]
 - [seq_input, out, pdu_add_system_time_0, pdu]
 - [tx_time_tagger_0, '0', wifi_tx, '0']
 - [tx_time_tagger_1, '0', zigbee_tx, '0']
