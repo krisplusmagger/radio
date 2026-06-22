@@ -209,7 +209,7 @@ blocks:
     start: '1'
     step: '1'
     stop: max_pkt_rate
-    value: '50'
+    value: '40'
     widget: counter_slider
   states:
     bus_sink: false
@@ -828,27 +828,7 @@ blocks:
 - name: seq_input
   id: epy_block
   parameters:
-    _source_code: "from gnuradio import gr\nimport pmt\nimport time\n\n\nclass blk(gr.basic_block):\n\
-      \    def __init__(self):\n        gr.basic_block.__init__(self, name=\"seq_pdu\"\
-      , in_sig=None, out_sig=None)\n\n        self.message_port_register_in(pmt.intern(\"\
-      in\"))\n        self.set_msg_handler(pmt.intern(\"in\"), self.handle_trigger)\n\
-      \        self.message_port_register_out(pmt.intern(\"out\"))\n\n        # Fixed\
-      \ payload, sent identically on every trigger. No ACK/NACK and no\n        #\
-      \ sequence increment: this flowgraph only verifies that the recovery\n     \
-      \   # algorithm decodes the packet, so one constant known payload is enough.\n\
-      \        # Keep the original payload format (\"NNNNNN TEXT\").\n        self.payload\
-      \ = b\"000001 HELLO WORLD\"\n        self.total_tx_count = 0\n        self.start_time\
-      \ = None\n        self.stats_filename = \"seq_pdu_stats.txt\"\n\n    def handle_trigger(self,\
-      \ msg):\n        if self.start_time is None:\n            self.start_time =\
-      \ time.monotonic()\n\n        payload = pmt.init_u8vector(len(self.payload),\
-      \ list(self.payload))\n        pdu = pmt.cons(pmt.make_dict(), payload)\n  \
-      \      self.message_port_pub(pmt.intern(\"out\"), pdu)\n\n        self.total_tx_count\
-      \ += 1\n        self.write_stats()\n\n    def write_stats(self):\n        elapsed\
-      \ = 0.0 if self.start_time is None else time.monotonic() - self.start_time\n\
-      \        with open(self.stats_filename, \"w\", encoding=\"ascii\") as f:\n \
-      \           f.write(f\"payload={self.payload.decode('ascii')}\\n\")\n      \
-      \      f.write(f\"total_tx_count={self.total_tx_count}\\n\")\n            f.write(f\"\
-      elapsed_seconds={elapsed:.6f}\\n\")\n"
+    _source_code: "from gnuradio import gr\nimport pmt\nimport time\n\n\nclass blk(gr.basic_block):\n    def __init__(self):\n        gr.basic_block.__init__(self, name=\"seq_pdu\", in_sig=None, out_sig=None)\n\n        self.message_port_register_in(pmt.intern(\"in\"))\n        self.set_msg_handler(pmt.intern(\"in\"), self.handle_trigger)\n        self.message_port_register_out(pmt.intern(\"out\"))\n\n        # Fixed payload, sent identically on every trigger. No ACK/NACK and no\n        # sequence increment: this flowgraph only verifies that the recovery\n        # algorithm decodes the packet, so one constant known payload is enough.\n        # Keep the original payload format (\"NNNNNN TEXT\").\n        self.payload = b\"000001 HELLO WORLD\"\n        self.total_tx_count = 0\n        self.start_time = None\n        self.stats_filename = \"seq_pdu_stats.txt\"\n        # Write the stats file at most once per this many triggers. Writing it\n        # on every trigger means synchronous disk I/O ~40x/s, which adds timing\n        # jitter that can push timed bursts past their tx_time (Late bursts).\n        self.stats_every = 40\n\n    def handle_trigger(self, msg):\n        if self.start_time is None:\n            self.start_time = time.monotonic()\n\n        payload = pmt.init_u8vector(len(self.payload), list(self.payload))\n        pdu = pmt.cons(pmt.make_dict(), payload)\n        self.message_port_pub(pmt.intern(\"out\"), pdu)\n\n        self.total_tx_count += 1\n        if self.total_tx_count % self.stats_every == 0:\n            self.write_stats()\n\n    def write_stats(self):\n        elapsed = 0.0 if self.start_time is None else time.monotonic() - self.start_time\n        with open(self.stats_filename, \"w\", encoding=\"ascii\") as f:\n            f.write(f\"payload={self.payload.decode('ascii')}\\n\")\n            f.write(f\"total_tx_count={self.total_tx_count}\\n\")\n            f.write(f\"elapsed_seconds={elapsed:.6f}\\n\")\n"
     affinity: ''
     alias: ''
     comment: ''
@@ -2353,7 +2333,7 @@ blocks:
   id: snippet
   parameters:
     alias: ''
-    code: "self.tx_time_tagger_0.set_time_source(lambda: self.wifi_tx.get_time_now().get_real_secs())"
+    code: "self.tx_time_tagger_0.set_time_source(lambda: self.wifi_tx.get_time_now().get_real_secs())\n# Shrink oversized 65536-sample ZigBee TX buffers so the tagger stays sink-paced (avoids batched, Late bursts).\nself.ieee802_15_4_oqpsk_phy_0.blocks_float_to_complex_0.set_min_output_buffer(2**13)\nself.ieee802_15_4_oqpsk_phy_0.blocks_tagged_stream_multiply_length_0.set_min_output_buffer(2**13)\nself.ieee802_15_4_oqpsk_phy_0.foo_packet_pad2_0.set_min_output_buffer(2**13)"
     comment: ''
     priority: '0'
     section: main_after_init

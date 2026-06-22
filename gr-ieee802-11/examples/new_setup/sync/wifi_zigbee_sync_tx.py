@@ -73,6 +73,10 @@ import wifi_zigbee_sync_tx_tx_time_tagger_1 as tx_time_tagger_1  # embedded pyth
 
 def snipfcn_tx_clock_bind(self):
     self.tx_time_tagger_0.set_time_source(lambda: self.wifi_tx.get_time_now().get_real_secs())
+    # Shrink oversized 65536-sample ZigBee TX buffers so the tagger stays sink-paced (avoids batched, Late bursts).
+    self.ieee802_15_4_oqpsk_phy_0.blocks_float_to_complex_0.set_min_output_buffer(2**13)
+    self.ieee802_15_4_oqpsk_phy_0.blocks_tagged_stream_multiply_length_0.set_min_output_buffer(2**13)
+    self.ieee802_15_4_oqpsk_phy_0.foo_packet_pad2_0.set_min_output_buffer(2**13)
 
 
 def snippets_main_after_init(tb):
@@ -121,7 +125,7 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
         self.tx_gain = tx_gain = 0.8
         self.samp_rate = samp_rate = 2e6
         self.rx_gain = rx_gain = 0.9
-        self.pkt_rate = pkt_rate = 50
+        self.pkt_rate = pkt_rate = 40
         self.max_pkt_rate = max_pkt_rate = int(samp_rate_zig/3336)
         self.lo_offset = lo_offset = 0
         self.freq = freq = 5920000000
@@ -173,7 +177,7 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
         self._rx_gain_range = qtgui.Range(0, 1, 0.01, 0.9, 200)
         self._rx_gain_win = qtgui.RangeWidget(self._rx_gain_range, self.set_rx_gain, "'rx_gain'", "counter_slider", float, QtCore.Qt.Horizontal)
         self.top_layout.addWidget(self._rx_gain_win)
-        self._pkt_rate_range = qtgui.Range(1, max_pkt_rate, 1, 50, 200)
+        self._pkt_rate_range = qtgui.Range(1, max_pkt_rate, 1, 40, 200)
         self._pkt_rate_win = qtgui.RangeWidget(self._pkt_rate_range, self.set_pkt_rate, "TX packets/sec (max=ZigBee limit)", "counter_slider", int, QtCore.Qt.Horizontal)
         self.top_layout.addWidget(self._pkt_rate_win)
         # Create the options list
@@ -332,7 +336,7 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
         self.seq_input = seq_input.blk()
         self.ieee802_15_4_oqpsk_phy_0 = ieee802_15_4_oqpsk_phy()
         self.digital_crc32_async_bb_0 = digital.crc32_async_bb(False)
-        self.digital_crc16_async_bb_1 = digital.crc16_async_bb(True)
+        self.digital_crc16_async_bb_0 = digital.crc16_async_bb(False)
         self.convert_ascii_0 = convert_ascii_0.blk()
         self.blocks_message_strobe_0 = blocks.message_strobe(pmt.intern("TEST"), (int(1000.0/pkt_rate)))
 
@@ -341,8 +345,9 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
         # Connections
         ##################################################
         self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.seq_input, 'in'))
+        self.msg_connect((self.digital_crc16_async_bb_0, 'out'), (self.ieee802_15_4_oqpsk_phy_0, 'txin'))
         self.msg_connect((self.digital_crc32_async_bb_0, 'out'), (self.wifi_phy_hier_0, 'mac_in'))
-        self.msg_connect((self.ieee802_15_4_oqpsk_phy_0, 'rxout'), (self.digital_crc16_async_bb_1, 'in'))
+        self.msg_connect((self.seq_input, 'out'), (self.digital_crc16_async_bb_0, 'in'))
         self.msg_connect((self.seq_input, 'out'), (self.digital_crc32_async_bb_0, 'in'))
         self.msg_connect((self.seq_input, 'out'), (self.ieee802_15_4_oqpsk_phy_0, 'txin'))
         self.msg_connect((self.wifi_phy_hier_0, 'mac_out'), (self.convert_ascii_0, 'in'))
