@@ -71,6 +71,12 @@ import wifi_zigbee_sync_tx_tx_time_tagger_0 as tx_time_tagger_0  # embedded pyth
 import wifi_zigbee_sync_tx_tx_time_tagger_1 as tx_time_tagger_1  # embedded python block
 
 
+def snipfcn_tx_clock_bind(self):
+    self.tx_time_tagger_0.set_time_source(lambda: self.wifi_tx.get_time_now().get_real_secs())
+
+
+def snippets_main_after_init(tb):
+    snipfcn_tx_clock_bind(tb)
 
 class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
 
@@ -469,14 +475,7 @@ def main(top_block_cls=wifi_zigbee_sync_tx, options=None):
     qapp = Qt.QApplication(sys.argv)
 
     tb = top_block_cls()
-
-    # Schedule timed bursts against the radio clock, not host wall time, so
-    # tx_time never drifts out from under the USRP (avoids the "cmd time
-    # error" / Late-burst flood). Mirrors the tx_clock_bind GRC snippet so a
-    # regeneration keeps this behavior; harmless if run twice.
-    tb.tx_time_tagger_0.set_time_source(
-        lambda: tb.wifi_tx.get_time_now().get_real_secs())
-
+    snippets_main_after_init(tb)
     tb.start()
     tb.flowgraph_started.set()
 
