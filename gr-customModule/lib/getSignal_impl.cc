@@ -77,9 +77,9 @@ namespace gr {
         // 2) write tags to start_index file (filter to the key you want)
         for (const auto& t : tags) {
             const std::string key = pmt::symbol_to_string(t.key);
-            if (key == "wifi_start_raw") {
+            if (key == "wifi_start") {
                 start_index_file
-                  << "offset=" << t.offset
+                  << "corase_cfo=" << t.offset
                   << " key=" << key
                   << " value=" << pmt::write_string(t.value)
                   << "\n";
@@ -93,8 +93,16 @@ namespace gr {
                   << "\n";
 
             }
+            if (key == "packet_len") {
+                start_index_file
+                  << "offset=" << t.offset
+                  << " key=" << key
+                  << " value=" << pmt::write_string(t.value)
+                  << "\n";
 
-            
+            }
+
+
         }
         start_index_file.flush();
         signal_file.flush();
