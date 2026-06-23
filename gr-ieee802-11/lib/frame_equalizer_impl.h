@@ -85,6 +85,7 @@ private:
                                       int ltf_start_raw,
                                       gr_complex* frame_symbols,
                                       int total_symbols) const;
+    bool try_decode_signal_with_salvage();
     bool try_decode_with_salvage(uint8_t* final_bits,
                                  std::vector<gr_complex>& final_symbols,
                                  bool& salvaged);

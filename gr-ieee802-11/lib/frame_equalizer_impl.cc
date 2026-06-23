@@ -262,7 +262,16 @@ int frame_equalizer_impl::general_work(int noutput_items,
             d_equalizer->equalize(
                 current_symbol, d_current_symbol, signal_symbols, signal_bits, d_frame_mod);
 
-            if (decode_signal_field(signal_bits)) {
+            bool signal_ok = decode_signal_field(signal_bits);
+            if (!signal_ok) {
+                // The SIGNAL field rides the same subcarriers as the LTF and is
+                // just as exposed to ZigBee interference as the payload. Don't
+                // drop the frame on a failed clean decode: cancel the ZigBee
+                // interference and re-decode the SIGNAL field first.
+                signal_ok = try_decode_signal_with_salvage();
+            }
+
+            if (signal_ok) {
                 d_signal_valid = true;
                 d_pending_meta = pmt::make_dict();
 
@@ -621,6 +630,74 @@ void frame_equalizer_impl::subtract_zigbee_interference(gr_complex h,
             frame_symbols[sym * 64 + bin] -= h * ref_fft[bin];
         }
     }
+}
+
+bool frame_equalizer_impl::try_decode_signal_with_salvage()
+{
+    // Called when the clean decode_signal_field() fails. The SIGNAL field
+    // (OFDM symbol index 2) can be polluted by ZigBee exactly like the payload,
+    // so instead of dropping the frame we estimate the ZigBee channel from the
+    // captured LTF, cancel its contribution from the LTF+SIGNAL symbols (0..2),
+    // re-equalize the SIGNAL symbol with a fresh equalizer, and re-decode.
+    // Mirrors the payload salvage in try_decode_with_salvage().
+    if (!d_reference_ready || d_captured_symbol_count < 3) {
+        return false;
+    }
+
+    struct ZigbeeCandidate {
+        int ltf_start_raw;
+        gr_complex h;
+        double score;
+    };
+    std::vector<ZigbeeCandidate> candidates;
+    candidates.reserve(2 * ZIGBEE_SEARCH_RADIUS + 1);
+    for (int candidate = ZIGBEE_DEFAULT_LTF_START_RAW - ZIGBEE_SEARCH_RADIUS;
+         candidate <= ZIGBEE_DEFAULT_LTF_START_RAW + ZIGBEE_SEARCH_RADIUS;
+         candidate++) {
+        gr_complex zigbee_h(0, 0);
+        double zigbee_score = 0.0;
+        if (!estimate_zigbee_channel_for_offset(candidate, zigbee_h, zigbee_score)) {
+            continue;
+        }
+        candidates.push_back({ candidate, zigbee_h, zigbee_score });
+    }
+    if (candidates.empty()) {
+        return false;
+    }
+    std::sort(candidates.begin(),
+              candidates.end(),
+              [](const ZigbeeCandidate& a, const ZigbeeCandidate& b) {
+                  return a.score > b.score;
+              });
+
+    const int decode_attempts = std::min(ZIGBEE_MAX_SALVAGE_DECODE_ATTEMPTS,
+                                          static_cast<int>(candidates.size()));
+    gr_complex cleaned[3 * 64];
+    uint8_t signal_bits[48];
+    uint8_t scratch_bits[48];
+    gr_complex signal_symbols[48];
+    gr_complex scratch_symbols[48];
+    for (int idx = 0; idx < decode_attempts; idx++) {
+        const ZigbeeCandidate& candidate = candidates[idx];
+
+        // Cancel ZigBee from the two LTF symbols and the SIGNAL symbol.
+        std::memcpy(cleaned, d_captured_symbols, 3 * 64 * sizeof(gr_complex));
+        subtract_zigbee_interference(candidate.h, candidate.ltf_start_raw, cleaned, 3);
+
+        // Fresh equalizer trained on the cleaned LTF, then equalize the SIGNAL
+        // symbol. The SIGNAL field is always BPSK, hence d_bpsk.
+        std::unique_ptr<equalizer::base> eq(create_equalizer(d_algorithm));
+        eq->equalize(cleaned, 0, scratch_symbols, scratch_bits, d_bpsk);
+        eq->equalize(cleaned + 64, 1, scratch_symbols, scratch_bits, d_bpsk);
+        eq->equalize(cleaned + 128, 2, signal_symbols, signal_bits, d_bpsk);
+
+        if (decode_signal_field(signal_bits)) {
+            d_last_zigbee_ltf_start_raw = candidate.ltf_start_raw;
+            d_last_correlation_score = candidate.score;
+            return true;
+        }
+    }
+    return false;
 }
 
 bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
