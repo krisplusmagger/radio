@@ -163,14 +163,34 @@ int frame_equalizer_impl::general_work(int noutput_items,
 
         // new frame
         if (tags.size()) {
-            reset_frame_capture();
+            // Layer 1 reset-guard: once a frame's SIGNAL field has decoded and its
+            // payload is still in flight, ignore further wifi_start tags. Under
+            // ZigBee interference sync_short/sync_long emit many false mid-frame
+            // wifi_start tags; without this guard each one wipes the in-progress
+            // decode. This does NOT tell WiFi from ZigBee -- it only protects an
+            // already-validated frame from being clobbered (the preamble window,
+            // before d_signal_valid, is still interruptible by design).
+            const bool in_live_frame =
+                d_signal_valid && (d_current_symbol <= d_frame_symbols + 2);
 
-            d_freq_offset_from_synclong =
-                pmt::to_double(tags.front().value) * d_bw / (2 * M_PI);
-            d_epsilon0 = pmt::to_double(tags.front().value) * d_bw / (2 * M_PI * d_freq);
-            d_er = 0;
+            if (!in_live_frame) {
+                dout << "RESET at d_current_symbol=" << d_current_symbol
+                     << "  d_frame_symbols=" << d_frame_symbols
+                     << "  d_signal_valid=" << d_signal_valid << std::endl;
+                reset_frame_capture();
 
-            dout << "epsilon: " << d_epsilon0 << std::endl;
+                d_freq_offset_from_synclong =
+                    pmt::to_double(tags.front().value) * d_bw / (2 * M_PI);
+                d_epsilon0 =
+                    pmt::to_double(tags.front().value) * d_bw / (2 * M_PI * d_freq);
+                d_er = 0;
+
+                dout << "epsilon: " << d_epsilon0 << std::endl;
+            } else {
+                dout << "IGNORED mid-frame wifi_start at d_current_symbol="
+                     << d_current_symbol << "  (d_frame_symbols=" << d_frame_symbols
+                     << ")" << std::endl;
+            }
         }
 
         // not interesting -> skip
@@ -269,10 +289,12 @@ int frame_equalizer_impl::general_work(int noutput_items,
                 // drop the frame on a failed clean decode: cancel the ZigBee
                 // interference and re-decode the SIGNAL field first.
                 signal_ok = try_decode_signal_with_salvage();
+                
             }
 
             if (signal_ok) {
                 d_signal_valid = true;
+                dout << "dsignal_ok; True  /n";
                 d_pending_meta = pmt::make_dict();
 
                 d_pending_meta = pmt::dict_add(
@@ -694,6 +716,7 @@ bool frame_equalizer_impl::try_decode_signal_with_salvage()
         if (decode_signal_field(signal_bits)) {
             d_last_zigbee_ltf_start_raw = candidate.ltf_start_raw;
             d_last_correlation_score = candidate.score;
+            dout << "signal filed success   ";
             return true;
         }
     }
@@ -706,10 +729,12 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
 {
     uint8_t attempt_bits[48 * MAX_SYM];
     salvaged = false;
+    dout << "222222222222222222222222222222222 /n";
 
     run_equalizer_attempt(d_captured_symbols, attempt_bits, final_symbols);
     if (decode_payload(attempt_bits, false)) {
         std::memcpy(final_bits, attempt_bits, d_frame.n_sym * 48);
+        dout << "111111111111111111111111111111111 /n";
         message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
         return true;
     }
@@ -898,6 +923,8 @@ bool frame_equalizer_impl::parse_signal(uint8_t* decoded_bits)
         dout << "SIGNAL: wrong parity" << std::endl;
         return false;
     }
+    r = 11; //only for experiments
+    d_frame_bytes = 22; //only for experiments
 
     switch (r) {
     case 11:
