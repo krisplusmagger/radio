@@ -79,9 +79,9 @@ namespace gr {
             const std::string key = pmt::symbol_to_string(t.key);
             if (key == "wifi_start") {
                 start_index_file
-                  << "corase_cfo=" << t.offset
+                  << "offset=" << t.offset
                   << " key=" << key
-                  << " value=" << pmt::write_string(t.value)
+                  << " coarse_cfo=" << pmt::write_string(t.value)
                   << "\n";
 
             }

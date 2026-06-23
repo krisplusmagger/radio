@@ -51,6 +51,7 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import QObject, pyqtSlot
 from gnuradio import blocks
 import pmt
+from gnuradio import customModule
 from gnuradio import digital
 from gnuradio import gr
 from gnuradio.filter import firdes
@@ -64,12 +65,9 @@ from gnuradio import uhd
 import time
 from ieee802_15_4_oqpsk_phy import ieee802_15_4_oqpsk_phy  # grc-generated hier_block
 from wifi_phy_hier import wifi_phy_hier  # grc-generated hier_block
-import sip
 import threading
 import wifi_zigbee_sync_tx_convert_ascii_0 as convert_ascii_0  # embedded python block
 import wifi_zigbee_sync_tx_seq_input as seq_input  # embedded python block
-import wifi_zigbee_sync_tx_tx_time_tagger_0 as tx_time_tagger_0  # embedded python block
-import wifi_zigbee_sync_tx_tx_time_tagger_1 as tx_time_tagger_1  # embedded python block
 
 
 def snipfcn_tx_clock_bind(self):
@@ -135,7 +133,7 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
         self.tx_gain = tx_gain = 0.8
         self.samp_rate = samp_rate = 2e6
         self.rx_gain = rx_gain = 0.9
-        self.pkt_rate = pkt_rate = 40
+        self.pkt_rate = pkt_rate = 57
         self.max_pkt_rate = max_pkt_rate = int(samp_rate_zig/3336)
         self.lo_offset = lo_offset = 0
         self.freq = freq = 5920000000
@@ -146,6 +144,28 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
         # Blocks
         ##################################################
 
+        self._tx_gain_zig_range = qtgui.Range(0, 1, 0.01, 1, 200)
+        self._tx_gain_zig_win = qtgui.RangeWidget(self._tx_gain_zig_range, self.set_tx_gain_zig, "'tx_gain_zig'", "counter_slider", float, QtCore.Qt.Horizontal)
+        self.top_layout.addWidget(self._tx_gain_zig_win)
+        self._tx_gain_range = qtgui.Range(0, 1, 0.01, 0.8, 200)
+        self._tx_gain_win = qtgui.RangeWidget(self._tx_gain_range, self.set_tx_gain, "'tx_gain'", "counter_slider", float, QtCore.Qt.Horizontal)
+        self.top_layout.addWidget(self._tx_gain_win)
+        # Create the options list
+        self._samp_rate_zig_options = [200000.0, 400000.0, 800000.0]
+        # Create the labels list
+        self._samp_rate_zig_labels = ['200KHz', '400 KHz', '800 KHz']
+        # Create the combo box
+        self._samp_rate_zig_tool_bar = Qt.QToolBar(self)
+        self._samp_rate_zig_tool_bar.addWidget(Qt.QLabel("'samp_rate_zig'" + ": "))
+        self._samp_rate_zig_combo_box = Qt.QComboBox()
+        self._samp_rate_zig_tool_bar.addWidget(self._samp_rate_zig_combo_box)
+        for _label in self._samp_rate_zig_labels: self._samp_rate_zig_combo_box.addItem(_label)
+        self._samp_rate_zig_callback = lambda i: Qt.QMetaObject.invokeMethod(self._samp_rate_zig_combo_box, "setCurrentIndex", Qt.Q_ARG("int", self._samp_rate_zig_options.index(i)))
+        self._samp_rate_zig_callback(self.samp_rate_zig)
+        self._samp_rate_zig_combo_box.currentIndexChanged.connect(
+            lambda i: self.set_samp_rate_zig(self._samp_rate_zig_options[i]))
+        # Create the radio buttons
+        self.top_layout.addWidget(self._samp_rate_zig_tool_bar)
         # Create the options list
         self._samp_rate_options = [2000000.0, 10000000.0, 20000000.0]
         # Create the labels list
@@ -162,6 +182,12 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
             lambda i: self.set_samp_rate(self._samp_rate_options[i]))
         # Create the radio buttons
         self.top_layout.addWidget(self._samp_rate_tool_bar)
+        self._rx_gain_range = qtgui.Range(0, 1, 0.01, 0.9, 200)
+        self._rx_gain_win = qtgui.RangeWidget(self._rx_gain_range, self.set_rx_gain, "'rx_gain'", "counter_slider", float, QtCore.Qt.Horizontal)
+        self.top_layout.addWidget(self._rx_gain_win)
+        self._pkt_rate_range = qtgui.Range(1, max_pkt_rate, 1, 57, 200)
+        self._pkt_rate_win = qtgui.RangeWidget(self._pkt_rate_range, self.set_pkt_rate, "TX packets/sec (max=ZigBee limit)", "counter_slider", int, QtCore.Qt.Horizontal)
+        self.top_layout.addWidget(self._pkt_rate_win)
         # Create the options list
         self._lo_offset_options = [0, 6000000.0, 11000000.0]
         # Create the labels list
@@ -194,48 +220,6 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
             lambda i: self.set_freq(self._freq_options[i]))
         # Create the radio buttons
         self.top_layout.addWidget(self._freq_tool_bar)
-        self._tx_gain_zig_range = qtgui.Range(0, 1, 0.01, 1, 200)
-        self._tx_gain_zig_win = qtgui.RangeWidget(self._tx_gain_zig_range, self.set_tx_gain_zig, "'tx_gain_zig'", "counter_slider", float, QtCore.Qt.Horizontal)
-        self.top_layout.addWidget(self._tx_gain_zig_win)
-        self._tx_gain_range = qtgui.Range(0, 1, 0.01, 0.8, 200)
-        self._tx_gain_win = qtgui.RangeWidget(self._tx_gain_range, self.set_tx_gain, "'tx_gain'", "counter_slider", float, QtCore.Qt.Horizontal)
-        self.top_layout.addWidget(self._tx_gain_win)
-        # Create the options list
-        self._samp_rate_zig_options = [200000.0, 400000.0, 800000.0]
-        # Create the labels list
-        self._samp_rate_zig_labels = ['200KHz', '400 KHz', '800 KHz']
-        # Create the combo box
-        self._samp_rate_zig_tool_bar = Qt.QToolBar(self)
-        self._samp_rate_zig_tool_bar.addWidget(Qt.QLabel("'samp_rate_zig'" + ": "))
-        self._samp_rate_zig_combo_box = Qt.QComboBox()
-        self._samp_rate_zig_tool_bar.addWidget(self._samp_rate_zig_combo_box)
-        for _label in self._samp_rate_zig_labels: self._samp_rate_zig_combo_box.addItem(_label)
-        self._samp_rate_zig_callback = lambda i: Qt.QMetaObject.invokeMethod(self._samp_rate_zig_combo_box, "setCurrentIndex", Qt.Q_ARG("int", self._samp_rate_zig_options.index(i)))
-        self._samp_rate_zig_callback(self.samp_rate_zig)
-        self._samp_rate_zig_combo_box.currentIndexChanged.connect(
-            lambda i: self.set_samp_rate_zig(self._samp_rate_zig_options[i]))
-        # Create the radio buttons
-        self.top_layout.addWidget(self._samp_rate_zig_tool_bar)
-        self._rx_gain_range = qtgui.Range(0, 1, 0.01, 0.9, 200)
-        self._rx_gain_win = qtgui.RangeWidget(self._rx_gain_range, self.set_rx_gain, "'rx_gain'", "counter_slider", float, QtCore.Qt.Horizontal)
-        self.top_layout.addWidget(self._rx_gain_win)
-        self._pkt_rate_range = qtgui.Range(1, max_pkt_rate, 1, 40, 200)
-        self._pkt_rate_win = qtgui.RangeWidget(self._pkt_rate_range, self.set_pkt_rate, "TX packets/sec (max=ZigBee limit)", "counter_slider", int, QtCore.Qt.Horizontal)
-        self.top_layout.addWidget(self._pkt_rate_win)
-        self.frequency = uhd.usrp_source(
-            ",".join(("addr=192.168.10.3", "")),
-            uhd.stream_args(
-                cpu_format="fc32",
-                args='',
-                channels=list(range(0,1)),
-            ),
-        )
-        self.frequency.set_samp_rate((samp_rate * 5))
-        self.frequency.set_time_unknown_pps(uhd.time_spec(0))
-
-        self.frequency.set_center_freq(uhd.tune_request(freq, rf_freq = freq - lo_offset, rf_freq_policy=uhd.tune_request.POLICY_MANUAL), 0)
-        self.frequency.set_antenna("RX2", 0)
-        self.frequency.set_normalized_gain(0.7, 0)
         # Create the options list
         self._encoding_options = [0, 1, 2, 3, 4, 5, 6, 7]
         # Create the labels list
@@ -295,17 +279,8 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
             ),
             'packet_len',
         )
-        self.zigbee_tx.set_clock_source('external', 0)
-        self.zigbee_tx.set_time_source('external', 0)
         self.zigbee_tx.set_samp_rate(samp_rate_zig)
-        _last_pps_time = self.zigbee_tx.get_time_last_pps().get_real_secs()
-        # Poll get_time_last_pps() every 50 ms until a change is seen
-        while(self.zigbee_tx.get_time_last_pps().get_real_secs() == _last_pps_time):
-            time.sleep(0.05)
-        # Set the time to PC time on next PPS
-        self.zigbee_tx.set_time_next_pps(uhd.time_spec(int(time.time()) + 1.0))
-        # Sleep 1 second to ensure next PPS has come
-        time.sleep(1)
+        self.zigbee_tx.set_time_unknown_pps(uhd.time_spec(0))
 
         self.zigbee_tx.set_center_freq(uhd.tune_request(freq, rf_freq = freq - lo_offset, rf_freq_policy=uhd.tune_request.POLICY_MANUAL), 0)
         self.zigbee_tx.set_antenna("TX/RX", 0)
@@ -319,17 +294,8 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
             ),
             'packet_len',
         )
-        self.wifi_tx.set_clock_source('external', 0)
-        self.wifi_tx.set_time_source('external', 0)
         self.wifi_tx.set_samp_rate(samp_rate)
-        _last_pps_time = self.wifi_tx.get_time_last_pps().get_real_secs()
-        # Poll get_time_last_pps() every 50 ms until a change is seen
-        while(self.wifi_tx.get_time_last_pps().get_real_secs() == _last_pps_time):
-            time.sleep(0.05)
-        # Set the time to PC time on next PPS
-        self.wifi_tx.set_time_next_pps(uhd.time_spec(int(time.time()) + 1.0))
-        # Sleep 1 second to ensure next PPS has come
-        time.sleep(1)
+        self.wifi_tx.set_time_unknown_pps(uhd.time_spec(0))
 
         self.wifi_tx.set_center_freq(uhd.tune_request(freq, rf_freq = freq - lo_offset, rf_freq_policy=uhd.tune_request.POLICY_MANUAL), 0)
         self.wifi_tx.set_antenna("TX/RX", 0)
@@ -355,31 +321,15 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
         self.uhd_usrp_source_0.set_center_freq(uhd.tune_request(freq, rf_freq = freq - lo_offset, rf_freq_policy=uhd.tune_request.POLICY_MANUAL), 0)
         self.uhd_usrp_source_0.set_antenna("TX/RX", 0)
         self.uhd_usrp_source_0.set_normalized_gain(rx_gain, 0)
-        self.tx_time_tagger_1 = tx_time_tagger_1.blk(lead=tx_lead, window=tx_window)
-        self.tx_time_tagger_0 = tx_time_tagger_0.blk(lead=tx_lead, window=tx_window)
         self.seq_input = seq_input.blk()
-        self.qtgui_sink_x_0 = qtgui.sink_c(
-            1024, #fftsize
-            window.WIN_BLACKMAN_hARRIS, #wintype
-            5.92e9, #fc
-            (samp_rate *5), #bw
-            "", #name
-            True, #plotfreq
-            True, #plotwaterfall
-            True, #plottime
-            True, #plotconst
-            None # parent
-        )
-        self.qtgui_sink_x_0.set_update_time(1.0/10)
-        self._qtgui_sink_x_0_win = sip.wrapinstance(self.qtgui_sink_x_0.qwidget(), Qt.QWidget)
-
-        self.qtgui_sink_x_0.enable_rf_freq(True)
-
-        self.top_layout.addWidget(self._qtgui_sink_x_0_win)
         self.ieee802_15_4_oqpsk_phy_0 = ieee802_15_4_oqpsk_phy()
         self.digital_crc32_async_bb_0 = digital.crc32_async_bb(False)
         self.digital_crc16_async_bb_1 = digital.crc16_async_bb(True)
         self.digital_crc16_async_bb_0 = digital.crc16_async_bb(False)
+        self.customModule_getSignal_1 = customModule.getSignal( 1, gr.sizeof_gr_complex, "1111.txt", "wifi_start_detect.txt")
+        self.customModule_getSignal_0_1 = customModule.getSignal( 1, gr.sizeof_gr_complex, "uselssdsadasdass.txt", "wifi_long_detect.txt")
+        self.customModule_getSignal_0_0 = customModule.getSignal( 1, gr.sizeof_gr_complex, "uselss.txt", "packtet_num_zigbee.txt")
+        self.customModule_getSignal_0 = customModule.getSignal( 1, gr.sizeof_gr_complex, "uselss.txt", "packtet_num_wifi.txt")
         self.convert_ascii_0 = convert_ascii_0.blk()
         self.blocks_message_strobe_0 = blocks.message_strobe(pmt.intern("TEST"), (int(1000.0/pkt_rate)))
 
@@ -394,13 +344,14 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
         self.msg_connect((self.seq_input, 'out'), (self.digital_crc16_async_bb_0, 'in'))
         self.msg_connect((self.seq_input, 'out'), (self.digital_crc32_async_bb_0, 'in'))
         self.msg_connect((self.wifi_phy_hier_0, 'mac_out'), (self.convert_ascii_0, 'in'))
-        self.connect((self.frequency, 0), (self.qtgui_sink_x_0, 0))
-        self.connect((self.ieee802_15_4_oqpsk_phy_0, 0), (self.tx_time_tagger_1, 0))
-        self.connect((self.tx_time_tagger_0, 0), (self.wifi_tx, 0))
-        self.connect((self.tx_time_tagger_1, 0), (self.zigbee_tx, 0))
+        self.connect((self.ieee802_15_4_oqpsk_phy_0, 0), (self.customModule_getSignal_0_0, 0))
+        self.connect((self.ieee802_15_4_oqpsk_phy_0, 0), (self.zigbee_tx, 0))
         self.connect((self.uhd_usrp_source_0, 0), (self.ieee802_15_4_oqpsk_phy_0, 0))
         self.connect((self.uhd_usrp_source_0, 0), (self.wifi_phy_hier_0, 0))
-        self.connect((self.wifi_phy_hier_0, 0), (self.tx_time_tagger_0, 0))
+        self.connect((self.wifi_phy_hier_0, 0), (self.customModule_getSignal_0, 0))
+        self.connect((self.wifi_phy_hier_0, 2), (self.customModule_getSignal_0_1, 0))
+        self.connect((self.wifi_phy_hier_0, 1), (self.customModule_getSignal_1, 0))
+        self.connect((self.wifi_phy_hier_0, 0), (self.wifi_tx, 0))
 
 
     def closeEvent(self, event):
@@ -453,8 +404,6 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
     def set_samp_rate(self, samp_rate):
         self.samp_rate = samp_rate
         self._samp_rate_callback(self.samp_rate)
-        self.frequency.set_samp_rate((self.samp_rate * 5))
-        self.qtgui_sink_x_0.set_frequency_range(5.92e9, (self.samp_rate *5))
         self.uhd_usrp_source_0.set_samp_rate(self.samp_rate)
         self.wifi_phy_hier_0.set_bandwidth(self.samp_rate)
         self.wifi_tx.set_samp_rate(self.samp_rate)
@@ -485,7 +434,6 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
     def set_lo_offset(self, lo_offset):
         self.lo_offset = lo_offset
         self._lo_offset_callback(self.lo_offset)
-        self.frequency.set_center_freq(uhd.tune_request(self.freq, rf_freq = self.freq - self.lo_offset, rf_freq_policy=uhd.tune_request.POLICY_MANUAL), 0)
         self.uhd_usrp_source_0.set_center_freq(uhd.tune_request(self.freq, rf_freq = self.freq - self.lo_offset, rf_freq_policy=uhd.tune_request.POLICY_MANUAL), 0)
         self.wifi_tx.set_center_freq(uhd.tune_request(self.freq, rf_freq = self.freq - self.lo_offset, rf_freq_policy=uhd.tune_request.POLICY_MANUAL), 0)
         self.wifi_tx.set_center_freq(uhd.tune_request(self.freq, rf_freq = self.freq - self.lo_offset, rf_freq_policy=uhd.tune_request.POLICY_MANUAL), 1)
@@ -497,7 +445,6 @@ class wifi_zigbee_sync_tx(gr.top_block, Qt.QWidget):
     def set_freq(self, freq):
         self.freq = freq
         self._freq_callback(self.freq)
-        self.frequency.set_center_freq(uhd.tune_request(self.freq, rf_freq = self.freq - self.lo_offset, rf_freq_policy=uhd.tune_request.POLICY_MANUAL), 0)
         self.uhd_usrp_source_0.set_center_freq(uhd.tune_request(self.freq, rf_freq = self.freq - self.lo_offset, rf_freq_policy=uhd.tune_request.POLICY_MANUAL), 0)
         self.wifi_phy_hier_0.set_frequency(self.freq)
         self.wifi_tx.set_center_freq(uhd.tune_request(self.freq, rf_freq = self.freq - self.lo_offset, rf_freq_policy=uhd.tune_request.POLICY_MANUAL), 0)

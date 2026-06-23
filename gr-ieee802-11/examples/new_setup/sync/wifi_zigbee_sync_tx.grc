@@ -209,7 +209,7 @@ blocks:
     start: '1'
     step: '1'
     stop: max_pkt_rate
-    value: '40'
+    value: '57'
     widget: counter_slider
   states:
     bus_sink: false
@@ -488,6 +488,74 @@ blocks:
     coordinate: [320, 456.0]
     rotation: 0
     state: enabled
+- name: customModule_getSignal_0
+  id: customModule_getSignal
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    length: '1'
+    signal_filename: '"uselss.txt"'
+    start_index_filename: '"packtet_num_wifi.txt"'
+    type: complex
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [368, 568.0]
+    rotation: 0
+    state: enabled
+- name: customModule_getSignal_0_0
+  id: customModule_getSignal
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    length: '1'
+    signal_filename: '"uselss.txt"'
+    start_index_filename: '"packtet_num_zigbee.txt"'
+    type: complex
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1680, 376.0]
+    rotation: 0
+    state: enabled
+- name: customModule_getSignal_0_1
+  id: customModule_getSignal
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    length: '1'
+    signal_filename: '"uselssdsadasdass.txt"'
+    start_index_filename: '"wifi_long_detect.txt"'
+    type: complex
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [200, 784.0]
+    rotation: 0
+    state: enabled
+- name: customModule_getSignal_1
+  id: customModule_getSignal
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    length: '1'
+    signal_filename: '"1111.txt"'
+    start_index_filename: '"wifi_start_detect.txt"'
+    type: complex
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [408, 1088.0]
+    rotation: 0
+    state: enabled
 - name: digital_crc16_async_bb_0
   id: digital_crc16_async_bb
   parameters:
@@ -501,7 +569,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1112, 312.0]
+    coordinate: [960, 304.0]
     rotation: 0
     state: enabled
 - name: digital_crc16_async_bb_1
@@ -533,7 +601,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [720, 584.0]
+    coordinate: [880, 688.0]
     rotation: 0
     state: enabled
 - name: foo_packet_pad2_0
@@ -1009,9 +1077,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [976, 732.0]
+    coordinate: [1136, 996.0]
     rotation: 180
-    state: enabled
+    state: disabled
 - name: ieee802_15_4_oqpsk_phy_0
   id: ieee802_15_4_oqpsk_phy
   parameters:
@@ -1024,7 +1092,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1368, 392.0]
+    coordinate: [1280, 392.0]
     rotation: 0
     state: enabled
 - name: pdu_add_system_time_0
@@ -1040,7 +1108,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [880, 216.0]
+    coordinate: [856, 208.0]
     rotation: 0
     state: disabled
 - name: pdu_pdu_to_tagged_stream_0
@@ -1259,9 +1327,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [888, 952.0]
+    coordinate: [1056, 1192.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: qtgui_time_sink_x_0
   id: qtgui_time_sink_x
   parameters:
@@ -1516,7 +1584,7 @@ blocks:
     bus_structure: null
     coordinate: [496, 552.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: tx_time_tagger_1
   id: epy_block
   parameters:
@@ -1588,7 +1656,7 @@ blocks:
     bus_structure: null
     coordinate: [1408, 648.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: uhd_usrp_source_0
   id: uhd_usrp_source
   parameters:
@@ -2022,7 +2090,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1016, 500.0]
+    coordinate: [1120, 548.0]
     rotation: 180
     state: enabled
 - name: wifi_phy_hier_0
@@ -2042,7 +2110,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [616, 336.0]
+    coordinate: [728, 792.0]
     rotation: 180
     state: enabled
 - name: wifi_tx
@@ -2147,7 +2215,7 @@ blocks:
     center_freq8: '0'
     center_freq9: '0'
     clock_rate: 0e0
-    clock_source0: external
+    clock_source0: ''
     clock_source1: ''
     clock_source2: ''
     clock_source3: ''
@@ -2305,8 +2373,8 @@ blocks:
     start_time: '-1.0'
     stream_args: ''
     stream_chans: '[]'
-    sync: pc_clock_next_pps
-    time_source0: external
+    sync: sync
+    time_source0: ''
     time_source1: ''
     time_source2: ''
     time_source3: ''
@@ -2319,7 +2387,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [640, 676.0]
+    coordinate: [640, 412.0]
     rotation: 0
     state: enabled
 - name: zigbee_tx
@@ -2424,7 +2492,7 @@ blocks:
     center_freq8: '0'
     center_freq9: '0'
     clock_rate: '0.0'
-    clock_source0: external
+    clock_source0: ''
     clock_source1: ''
     clock_source2: ''
     clock_source3: ''
@@ -2582,8 +2650,8 @@ blocks:
     start_time: '-1.0'
     stream_args: ''
     stream_chans: '[]'
-    sync: pc_clock_next_pps
-    time_source0: external
+    sync: sync
+    time_source0: ''
     time_source1: ''
     time_source2: ''
     time_source3: ''
@@ -2610,8 +2678,10 @@ connections:
 - [foo_packet_pad2_1, '0', tx_time_tagger_1, '0']
 - [frequency, '0', qtgui_freq_sink_x_0, '0']
 - [frequency, '0', qtgui_sink_x_0, '0']
+- [ieee802_15_4_oqpsk_phy_0, '0', customModule_getSignal_0_0, '0']
 - [ieee802_15_4_oqpsk_phy_0, '0', foo_packet_pad2_1, '0']
 - [ieee802_15_4_oqpsk_phy_0, '0', tx_time_tagger_1, '0']
+- [ieee802_15_4_oqpsk_phy_0, '0', zigbee_tx, '0']
 - [ieee802_15_4_oqpsk_phy_0, rxout, digital_crc16_async_bb_1, in]
 - [pdu_add_system_time_0, pdu, digital_crc16_async_bb_0, in]
 - [pdu_add_system_time_0, pdu, digital_crc32_async_bb_0, in]
@@ -2624,8 +2694,12 @@ connections:
 - [uhd_usrp_source_0, '0', ieee802_15_4_oqpsk_phy_0, '0']
 - [uhd_usrp_source_0, '0', wifi_phy_hier_0, '0']
 - [wifi_phy_hier_0, '0', blocks_multiply_const_vxx_0, '0']
+- [wifi_phy_hier_0, '0', customModule_getSignal_0, '0']
 - [wifi_phy_hier_0, '0', qtgui_time_sink_x_0, '0']
 - [wifi_phy_hier_0, '0', tx_time_tagger_0, '0']
+- [wifi_phy_hier_0, '0', wifi_tx, '0']
+- [wifi_phy_hier_0, '1', customModule_getSignal_1, '0']
+- [wifi_phy_hier_0, '2', customModule_getSignal_0_1, '0']
 - [wifi_phy_hier_0, mac_out, blocks_message_debug_0, print]
 - [wifi_phy_hier_0, mac_out, convert_ascii_0, in]
 - [wifi_phy_hier_0, tx_feedback, blocks_message_debug_1, print]

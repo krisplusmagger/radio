@@ -162,7 +162,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [432, 976.0]
+    coordinate: [512, 1000.0]
     rotation: 0
     state: enabled
 - name: blocks_delay_0_0
@@ -220,7 +220,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [752, 656.0]
+    coordinate: [736, 656.0]
     rotation: 0
     state: true
 - name: blocks_moving_average_xx_1
@@ -547,7 +547,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [560, 1088.0]
+    coordinate: [568, 1096.0]
     rotation: 180
     state: enabled
 - name: ieee802_11_frame_equalizer_0
@@ -558,9 +558,9 @@ blocks:
     alias: ''
     bw: bandwidth
     comment: ''
-    debug: 'False'
+    debug: 'True'
     freq: frequency
-    log: 'False'
+    log: 'True'
     maxoutbuf: '0'
     minoutbuf: '0'
     signal_filename: '"zigbee_test.txt"'
@@ -568,7 +568,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [848, 1108.0]
+    coordinate: [880, 1124.0]
     rotation: 180
     state: enabled
 - name: ieee802_11_mapper_0
@@ -606,6 +606,42 @@ blocks:
     coordinate: [528, 376.0]
     rotation: 180
     state: enabled
+- name: pad_sink_1
+  id: pad_sink
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    label: sync_short_out
+    num_streams: '1'
+    optional: 'False'
+    type: complex
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [176, 1000.0]
+    rotation: 0
+    state: enabled
+- name: pad_sink_1_0
+  id: pad_sink
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    label: sync_long_out
+    num_streams: '1'
+    optional: 'False'
+    type: complex
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1224, 960.0]
+    rotation: 0
+    state: enabled
 - name: pad_sink_2
   id: pad_sink
   parameters:
@@ -621,7 +657,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [376, 1096.0]
+    coordinate: [336, 1096.0]
     rotation: 180
     state: enabled
 - name: pad_sink_3
@@ -639,7 +675,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [432, 1280.0]
+    coordinate: [576, 1264.0]
     rotation: 180
     state: enabled
 - name: pad_source_0
@@ -714,7 +750,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [712, 936.0]
+    coordinate: [800, 960.0]
     rotation: 0
     state: enabled
 - name: sync_short
@@ -733,7 +769,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [472, 784.0]
+    coordinate: [464, 816.0]
     rotation: 0
     state: enabled
 
@@ -768,7 +804,9 @@ connections:
 - [pad_source_0, '0', blocks_multiply_xx_0, '0']
 - [pad_source_1, out, ieee802_11_mapper_0, in]
 - [sync_long, '0', blocks_stream_to_vector_0, '0']
+- [sync_long, '0', pad_sink_1_0, '0']
 - [sync_short, '0', blocks_delay_0, '0']
+- [sync_short, '0', pad_sink_1, '0']
 - [sync_short, '0', sync_long, '0']
 
 metadata:
