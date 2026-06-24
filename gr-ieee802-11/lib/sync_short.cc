@@ -18,6 +18,8 @@
 #include <gnuradio/io_signature.h>
 #include <ieee802_11/sync_short.h>
 
+#include <complex>
+#include <deque>
 #include <iostream>
 
 using namespace gr::ieee802_11;
@@ -78,7 +80,9 @@ public:
                     } else {
                         d_state = COPY;
                         d_copied = 0;
-                        d_freq_offset = arg(in_abs[i]) / 16;
+                        // P0: coarse CFO from the band-stopped signal (ZigBee
+                        // removed) instead of the full-band arg(in_abs[i]) / 16.
+                        d_freq_offset = cfo_estimate(in_abs[i]);
                         d_plateau = 0;
                         // nitems_written(0) how many items produced so far by this block
                         // nitems_read(0) + i, the absolute index on the input port
@@ -89,6 +93,8 @@ public:
                 } else {
                     d_plateau = 0;
                 }
+                // feed the consumed sample into the band-stop CFO estimator
+                cfo_feed(in[i]);
             }
 
             consume_each(i);
@@ -107,7 +113,8 @@ public:
                     } else if (d_copied > MIN_GAP) {
                         d_copied = 0;
                         d_plateau = 0;
-                        d_freq_offset = arg(in_abs[o]) / 16;
+                        // P0: band-stopped coarse CFO (see SEARCH state).
+                        d_freq_offset = cfo_estimate(in_abs[o]);
                         insert_tag(
                             nitems_written(0) + o, d_freq_offset, nitems_read(0) + o);
                         dout << "SHORT Frame!" << std::endl;
@@ -119,6 +126,8 @@ public:
                 }
 
                 out[o] = in[o] * exp(gr_complex(0, -d_freq_offset * d_copied));
+                // feed the consumed sample into the band-stop CFO estimator
+                cfo_feed(in[o]);
                 o++;
                 d_copied++;
             }
@@ -153,6 +162,71 @@ public:
     }
 
 private:
+    // -------- P0: band-stopped coarse-CFO estimator -------------------------
+    // ZigBee is narrowband around DC (the central ~7-8 of the 64 subcarriers).
+    // The upstream lag-16 autocorrelation (in_abs) is full-band, so a strong
+    // narrowband ZigBee biases arg(in_abs)/16; the resulting coarse CFO can land
+    // outside sync_long's fine-correction range (+/-pi/64), leaving an
+    // uncorrectable frame-wide offset that destroys OFDM decoding.
+    //
+    // We re-estimate the coarse CFO from a HIGH-PASSED copy of the signal: a
+    // short moving-average (length CFO_HP_MA) is a low-pass whose -3 dB point is
+    // ~+/-4 subcarriers, so y = x - movavg(x) removes the central ZigBee bins.
+    // The WiFi STF tones sit on every 4th subcarrier, so all of them share the
+    // 16-sample period; removing the central +/-4 bins discards ZigBee while
+    // keeping the lag-16 periodicity the autocorrelation relies on. We then form
+    // the lag-16 product and average it over CFO_WIN samples, exactly mirroring
+    // the upstream metric but on the band-stopped signal.
+    static constexpr int CFO_LAG = 16;    // STF repetition period (autocorr lag)
+    static constexpr int CFO_HP_MA = 8;   // moving-average length -> notch ~ +/-4 bins
+    static constexpr int CFO_WIN = 48;    // autocorrelation averaging window
+
+    // Push one (consumed) input sample into the streaming band-stop estimator.
+    void cfo_feed(gr_complex x)
+    {
+        // 1) high-pass: subtract a short moving average (removes DC + ZigBee core)
+        d_cfo_raw.push_back(x);
+        d_cfo_raw_sum += x;
+        if ((int)d_cfo_raw.size() > CFO_HP_MA) {
+            d_cfo_raw_sum -= d_cfo_raw.front();
+            d_cfo_raw.pop_front();
+        }
+        const gr_complex hp =
+            x - d_cfo_raw_sum / gr_complex((float)d_cfo_raw.size(), 0.0f);
+
+        // 2) lag-16 product hp[n] * conj(hp[n-16])
+        d_cfo_hp.push_back(hp);
+        gr_complex prod(0.0f, 0.0f);
+        if ((int)d_cfo_hp.size() > CFO_LAG) {
+            prod = d_cfo_hp.back() * std::conj(d_cfo_hp.front());
+            d_cfo_hp.pop_front();
+        }
+
+        // 3) moving-average the product over CFO_WIN samples
+        d_cfo_prod.push_back(prod);
+        d_cfo_auto += prod;
+        if ((int)d_cfo_prod.size() > CFO_WIN) {
+            d_cfo_auto -= d_cfo_prod.front();
+            d_cfo_prod.pop_front();
+        }
+    }
+
+    // Band-stopped coarse CFO (rad/sample). Falls back to the full-band estimate
+    // until the estimator window has warmed up.
+    float cfo_estimate(gr_complex fullband_in_abs) const
+    {
+        if (std::abs(d_cfo_auto) < 1e-6f) {
+            return arg(fullband_in_abs) / CFO_LAG;
+        }
+        return arg(d_cfo_auto) / CFO_LAG;
+    }
+
+    std::deque<gr_complex> d_cfo_raw;
+    std::deque<gr_complex> d_cfo_hp;
+    std::deque<gr_complex> d_cfo_prod;
+    gr_complex d_cfo_raw_sum{ 0.0f, 0.0f };
+    gr_complex d_cfo_auto{ 0.0f, 0.0f };
+
     enum { SEARCH, COPY } d_state;
     int d_copied;
     int d_plateau;
