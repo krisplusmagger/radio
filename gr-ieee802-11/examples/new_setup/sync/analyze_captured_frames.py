@@ -105,6 +105,18 @@ def per_bin_snr(frames):
     return (sig / cnt) / np.maximum(noi / cnt, 1e-12)
 
 
+def per_symbol_power(frames, bins):
+    """Mean power in `bins` per OFDM-symbol index, averaged over frames (common length).
+    Reveals whether ZigBee (central bins) is constant across the frame or a burst that
+    only overlaps part of it, and whether the outer band degrades over the payload."""
+    n = min(fr["sym"].shape[0] for fr in frames)
+    acc = np.zeros(n)
+    for fr in frames:
+        s = fr["sym"][:n]
+        acc += np.mean(np.abs(s[:, bins]) ** 2, axis=1)
+    return acc / len(frames)
+
+
 def aggregate_M(frames):
     """Recompute the C++ outer-bin M from captures, to cross-check the header value."""
     vals = []
@@ -192,31 +204,42 @@ def main():
     gsnr = per_bin_snr(good) if good else None
     bsnr = per_bin_snr(fail) if fail else None
     to_db = lambda lin: 10 * np.log10(np.maximum(lin, 1e-12))
-    if gsnr is not None and bsnr is not None:
-        g_outer_snr = to_db(gsnr[OUTER_BINS].mean())
+    near = [k for k in OUTER_BINS if abs(k - DC) <= 8]   # carriers just outside ZigBee
+    far = [k for k in OUTER_BINS if abs(k - DC) >= 16]   # band edges
+
+    # Each bucket's outer-bin SNR is reported independently, so the FAIL diagnostic
+    # still shows when the GOOD bucket is empty (e.g. nothing decoded under ZigBee).
+    print("OUTER-BIN SNR (ZigBee-free carriers, split-symbol estimate):")
+    if gsnr is not None:
+        print(f"  GOOD outer : {to_db(gsnr[OUTER_BINS].mean()):.1f} dB"
+              f"   (aggregate M {aggregate_M(good):.3f})")
+    if bsnr is not None:
         b_outer_snr = to_db(bsnr[OUTER_BINS].mean())
-        print("OUTER-BIN SNR (ZigBee-free carriers, split-symbol estimate):")
-        print(f"  good : {g_outer_snr:.1f} dB      fail : {b_outer_snr:.1f} dB"
-              f"      (drop {g_outer_snr - b_outer_snr:.1f} dB)")
-        print(f"  cross-check aggregate M  good/fail   : "
-              f"{aggregate_M(good):.3f} / {aggregate_M(fail):.3f}  (header said 0.999 / 0.737)")
-        # Is the FAIL SNR dip broadband or only near the center?
-        near = [k for k in OUTER_BINS if abs(k - DC) <= 8]   # carriers just outside ZigBee
-        far = [k for k in OUTER_BINS if abs(k - DC) >= 16]   # band edges
-        print(f"  FAIL SNR near-center vs far-edge      : "
-              f"{to_db(bsnr[near].mean()):.1f} dB / {to_db(bsnr[far].mean()):.1f} dB")
-        if b_outer_snr < g_outer_snr - 6:
-            # Far-edge cleaner than near-center => leakage gradient (ZigBee spills just
-            # past the erase band). Edges as bad as the center => broadband floor.
-            far_minus_near = to_db(bsnr[far].mean()) - to_db(bsnr[near].mean())
-            if far_minus_near > 4:
-                print(f"  -> dip concentrated NEAR the center (edges {far_minus_near:.1f} dB"
-                      " cleaner) => ZigBee leakage spilling just past the erase band.")
-                print("     Widening the erase band [28..36] may recover these frames.")
-            else:
-                print("  -> dip is BROADBAND (edges hurt too) => ZigBee desensitizes the"
-                      " whole chain (AGC/clipping). Erasing wider will NOT help;")
-                print("     lower rx_gain / lower ZigBee TX power to restore outer-bin SNR.")
+        print(f"  FAIL outer : {b_outer_snr:.1f} dB"
+              f"   near-center {to_db(bsnr[near].mean()):.1f} dB / far-edge {to_db(bsnr[far].mean()):.1f} dB"
+              f"   (aggregate M {aggregate_M(fail):.3f})")
+        # Leakage gradient (far cleaner than near) vs broadband floor.
+        far_minus_near = to_db(bsnr[far].mean()) - to_db(bsnr[near].mean())
+        if far_minus_near > 4:
+            print(f"  -> FAIL dip concentrated NEAR the center (edges {far_minus_near:.1f} dB"
+                  " cleaner) => ZigBee leakage just past the erase band; widening it may help.")
+        elif b_outer_snr < 15:
+            print("  -> FAIL dip is BROADBAND (edges hurt too) => ZigBee desensitizes the"
+                  " whole chain; widening the erase band will NOT help, reduce ZigBee/RX power.")
+    if gsnr is not None and bsnr is not None:
+        print(f"  drop GOOD->FAIL outer SNR             : "
+              f"{to_db(gsnr[OUTER_BINS].mean()) - b_outer_snr:.1f} dB")
+
+    # Per-symbol profile of the FAIL frames: is ZigBee constant or a burst, and does the
+    # outer band hold up across the payload? Symbols 0,1=LTF  2=SIGNAL  3+=payload.
+    if fail:
+        cen = per_symbol_power(fail, ZB_BINS)
+        out = per_symbol_power(fail, OUTER_BINS)
+        print("PER-SYMBOL (FAIL): central(ZigBee) / outer(WiFi) power, SIR per symbol")
+        for i in range(len(cen)):
+            role = "LTF" if i < 2 else ("SIG" if i == 2 else f"pay{i-3}")
+            sir = 10 * np.log10(out[i] / cen[i]) if cen[i] > 0 else float("inf")
+            print(f"    sym {i:2d} {role:5s} cen={cen[i]:.4g}  out={out[i]:.4g}  SIR={sir:+.1f} dB")
 
     if g is not None and b is not None:
         # Absolute-power comparison (note: confounded if good/fail are different runs).
