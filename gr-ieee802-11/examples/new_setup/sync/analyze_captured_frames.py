@@ -35,6 +35,14 @@ PILOTS = {11, 25, 39, 53}
 ZB_BINS = [k for k in OCC if ZB_LO <= k <= ZB_HI]
 OUTER_BINS = [k for k in OCC if not (ZB_LO <= k <= ZB_HI) and k not in PILOTS and k != DC]
 
+# The transmitted WiFi frame is a fixed test payload: bytes==22 -> nsym==9 (BPSK
+# rate-1/2: nsym = ceil((16 + 8*22 + 6)/24) = 9). FAIL captures also contain false
+# detections whose SIGNAL field decoded to garbage (other bytes/nsym); filter the FAIL
+# bucket to these expected values so the analysis reflects REAL WiFi that failed, not
+# noise that slipped past the veto. Set EXPECTED_BYTES/NSYM to None to disable.
+EXPECTED_BYTES = 22
+EXPECTED_NSYM = 9
+
 
 def load_frames(path):
     """Yield dicts: {meta fields..., 'sym': complex ndarray (total_sym, 64)}."""
@@ -144,6 +152,22 @@ def main():
     good = load_frames(good_path)
     fail = load_frames(fail_path)
 
+    # Keep only genuine WiFi frames in the FAIL bucket (drop garbage-SIGNAL false
+    # detections). Header fields are strings; compare as ints.
+    def _int(fr, key):
+        try:
+            return int(fr.get(key))
+        except (ValueError, TypeError):
+            return None
+
+    if EXPECTED_BYTES is not None and EXPECTED_NSYM is not None:
+        fail_all = fail
+        fail = [fr for fr in fail
+                if _int(fr, "bytes") == EXPECTED_BYTES and _int(fr, "nsym") == EXPECTED_NSYM]
+        print(f"FAIL filter  bytes=={EXPECTED_BYTES} & nsym=={EXPECTED_NSYM}: "
+              f"kept {len(fail)} of {len(fail_all)} captured fail frames "
+              f"(dropped {len(fail_all) - len(fail)} false detections)")
+
     print("=" * 64)
     g = summarize(good, "GOOD (passed CRC)")
     print("-" * 64)
@@ -169,9 +193,13 @@ def main():
         print(f"  FAIL SNR near-center vs far-edge      : "
               f"{to_db(bsnr[near].mean()):.1f} dB / {to_db(bsnr[far].mean()):.1f} dB")
         if b_outer_snr < g_outer_snr - 6:
-            if to_db(bsnr[near].mean()) - to_db(bsnr[far].mean()) > 4:
-                print("  -> dip concentrated NEAR the center => ZigBee leakage spilling"
-                      " outward. Widening the erase band may recover some frames.")
+            # Far-edge cleaner than near-center => leakage gradient (ZigBee spills just
+            # past the erase band). Edges as bad as the center => broadband floor.
+            far_minus_near = to_db(bsnr[far].mean()) - to_db(bsnr[near].mean())
+            if far_minus_near > 4:
+                print(f"  -> dip concentrated NEAR the center (edges {far_minus_near:.1f} dB"
+                      " cleaner) => ZigBee leakage spilling just past the erase band.")
+                print("     Widening the erase band [28..36] may recover these frames.")
             else:
                 print("  -> dip is BROADBAND (edges hurt too) => ZigBee desensitizes the"
                       " whole chain (AGC/clipping). Erasing wider will NOT help;")
