@@ -50,10 +50,14 @@ public:
 private:
     bool parse_signal(uint8_t* signal);
     bool decode_signal_field(uint8_t* rx_bits);
+    bool decode_signal_field_erased(const uint8_t* rx_bits);
     void deinterleave(uint8_t* rx_bits);
-    void deinterleave();
+    void deinterleave(bool erase_central = false);
     void descramble(uint8_t* decoded_bits);
-    bool decode_payload(const uint8_t* rx_symbols, bool publish_feedback);
+    bool decode_payload(const uint8_t* rx_symbols,
+                        bool publish_feedback,
+                        bool erase_central = false);
+    void compute_erasure_carriers();
     void write_signal_symbols();
     equalizer::base* create_equalizer(Equalizer algo) const;
     bool load_complex_csv_skip_header(const std::string& path,
@@ -85,6 +89,7 @@ private:
                                       int ltf_start_raw,
                                       gr_complex* frame_symbols,
                                       int total_symbols) const;
+    bool ltf_clean_band_ok();
     bool try_decode_signal_with_salvage();
     bool try_decode_with_salvage(uint8_t* final_bits,
                                  std::vector<gr_complex>& final_symbols,
@@ -92,6 +97,13 @@ private:
     int flush_pending_output(uint8_t* out, int noutput_items);
     void publish_payload_symbols(const std::vector<gr_complex>& payload_symbols);
     void write_correction_stats();
+    void capture_raw_frame(std::ofstream& file,
+                           int& counter,
+                           const gr_complex* raw,
+                           int total_symbols,
+                           const char* outcome,
+                           const char* tier,
+                           double score);
 
     equalizer::base* d_equalizer;
     gr::thread::mutex d_mutex;
@@ -101,6 +113,12 @@ private:
     Equalizer d_algorithm;
     int d_current_symbol;
     std::ofstream signal_file;
+    std::ofstream d_diag_file;       // unconditional per-frame diagnostics (M + outcome)
+    float d_diag_m = 0.0f;           // clean-band LTF agreement M of the current frame
+    std::ofstream d_good_frames_file; // raw (pre-equalizer) frames that passed CRC
+    std::ofstream d_fail_frames_file; // raw frames that reached salvage/erasure but failed CRC
+    int d_good_capture_count = 0;
+    int d_fail_capture_count = 0;
     viterbi_decoder d_decoder;
 
     // freq offset
@@ -125,10 +143,13 @@ private:
     uint8_t out_bytes[MAX_PSDU_SIZE + 2];
     gr_complex d_saved_signal_symbols[2 * 64];
     gr_complex d_captured_symbols[(MAX_SYM + 3) * 64];
+    gr_complex d_raw_snapshot[(MAX_SYM + 3) * 64]; // pre-equalizer copy for frame capture
     uint8_t d_pending_output_bits[48 * MAX_SYM];
     std::vector<gr_complex> d_pending_payload_symbols;
     bool d_signal_symbols_pending;
     bool d_signal_valid;
+    bool d_ltf_clean_ok = true; // Layer 2 clean-band LTF veto result for current frame
+    std::vector<int> d_erasure_carriers; // data-carrier indices ZigBee corrupts (erasures)
     int d_captured_symbol_count;
     int d_pending_output_items;
     int d_pending_output_offset;

@@ -34,9 +34,28 @@ namespace ieee802_11 {
 
 namespace {
 constexpr int ZIGBEE_DEFAULT_LTF_START_RAW = 176;
-constexpr int ZIGBEE_SEARCH_RADIUS = 20;
-constexpr int ZIGBEE_MAX_SALVAGE_DECODE_ATTEMPTS = 41; // search radius * 2 + 1
+constexpr int ZIGBEE_SEARCH_RADIUS = 144;
+constexpr int ZIGBEE_MAX_SALVAGE_DECODE_ATTEMPTS = 289; // search radius * 2 + 1
 constexpr int ZIGBEE_NFFT = 64;
+
+// Clean-band LTF veto (Layer 2): exclude FFT bins LTF_VETO_BIN_LO..HI (DC and the
+// central subcarriers ZigBee occupies) when checking whether the two LTF symbols
+// agree. The remaining outer bins are ZigBee-free, so the agreement separates a
+// genuine WiFi frame (M ~ 1) from a false detection (M ~ 1/sqrt(N) ~ 0.15).
+constexpr int LTF_VETO_BIN_LO = 28; // central bins to exclude (ZigBee core + DC=32)
+constexpr int LTF_VETO_BIN_HI = 36;
+// Accept frame iff clean-band LTF agreement >= this. The noise floor is ~1/sqrt(N)
+// ~ 0.15 (N ~ 44 clean bins); a genuine frame gives M ~ gamma/(gamma+1) in mean, so
+// 0.25 stays safely above the floor yet still admits low-SNR / strong-ZigBee frames
+// that the ZigBee-salvage path can recover. Tune from the logged M on real captures.
+constexpr double LTF_VETO_THRESH = 0.25;
+
+// Raw-frame capture (offline analysis): dump the pre-equalizer frame for frames that
+// PASS the CRC (good) and for frames that reach the salvage/erasure stage but still
+// FAIL the CRC (hard). Capped per bucket so a long run does not fill the disk; raise
+// if you need a bigger sample. Compare the two sets offline to see why processing
+// cannot rescue the hard frames (wider ZigBee? low outer-bin SNR? residual CFO?).
+constexpr int CAPTURE_MAX_PER_BUCKET = 400;
 } // namespace
 
 frame_equalizer::sptr
@@ -89,6 +108,16 @@ frame_equalizer_impl::frame_equalizer_impl(
     if(!signal_file.is_open()) {
         throw std::runtime_error("Failed to open signal files: " + signal_filename);
     }
+    // Unconditional per-frame diagnostics (independent of the debug flag): the
+    // clean-band LTF agreement M for every detected frame, plus the payload
+    // outcome (CLEAN / SALVAGE / ERASURE / FAIL). Lets us tell whether the frames
+    // that fail the clean decode are real corrupted WiFi (high M) or noise (low M).
+    d_diag_file.open("ltf_diag.txt", std::ios::out | std::ios::trunc);
+    // Raw (pre-equalizer) frame captures, split into the two buckets we want to
+    // compare offline: frames that pass the CRC vs frames that reach salvage/erasure
+    // but still fail it. Truncated each run, written in the launch directory.
+    d_good_frames_file.open("captured_good_frames.txt", std::ios::out | std::ios::trunc);
+    d_fail_frames_file.open("captured_fail_frames.txt", std::ios::out | std::ios::trunc);
     message_port_register_out(pmt::mp("symbols"));
     message_port_register_out(pmt::mp("tx_feedback"));
 
@@ -100,6 +129,7 @@ frame_equalizer_impl::frame_equalizer_impl(
     d_frame_mod = d_bpsk;
 
     set_tag_propagation_policy(block::TPP_DONT);
+    compute_erasure_carriers();
     d_reference_ready = load_reference_data();
     precompute_zigbee_reference_ffts();
     reset_frame_capture();
@@ -275,8 +305,16 @@ int frame_equalizer_impl::general_work(int noutput_items,
                 current_symbol, d_current_symbol, dummy_symbols, dummy_bits, d_bpsk);
         }
 
-        // signal field
-        if (d_current_symbol == 2) {
+        // Layer 2 clean-band LTF veto: once both LTF symbols are captured, decide
+        // whether this is a genuine WiFi frame before spending effort on SIGNAL/
+        // payload. A real frame has two identical LTF symbols, so they agree on the
+        // ZigBee-free outer subcarriers; a false detection (ZigBee/noise) does not.
+        if (d_current_symbol == 1) {
+            d_ltf_clean_ok = ltf_clean_band_ok();
+        }
+
+        // signal field (only if the clean-band LTF veto accepted this frame)
+        if (d_current_symbol == 2 && d_ltf_clean_ok) {
             uint8_t signal_bits[48];
             gr_complex signal_symbols[48];
             d_equalizer->equalize(
@@ -289,7 +327,13 @@ int frame_equalizer_impl::general_work(int noutput_items,
                 // drop the frame on a failed clean decode: cancel the ZigBee
                 // interference and re-decode the SIGNAL field first.
                 signal_ok = try_decode_signal_with_salvage();
-                
+            }
+            if (!signal_ok) {
+                // Last resort: erase the ZigBee-corrupted central subcarriers and
+                // let the convolutional code + interleaver fill them in. No ZigBee
+                // reference or cancellation needed -- exploits only the known
+                // (fixed) location of the interference.
+                signal_ok = decode_signal_field_erased(signal_bits);
             }
 
             if (signal_ok) {
@@ -318,6 +362,12 @@ int frame_equalizer_impl::general_work(int noutput_items,
                 message_port_pub(pmt::mp("tx_feedback"), pmt::intern("nack"));
                 d_signal_symbols_pending = false;
             }
+        } else if (d_current_symbol == 2 && d_signal_symbols_pending) {
+            // Frame was rejected by the clean-band LTF veto. Emit a NACK so the
+            // ARQ peer retransmits instead of stalling: seq_input has no timeout,
+            // so staying silent on a (possibly false) veto would deadlock the link.
+            message_port_pub(pmt::mp("tx_feedback"), pmt::intern("nack"));
+            d_signal_symbols_pending = false;
         }
 
         if (d_signal_valid && d_current_symbol == d_frame_symbols + 2) {
@@ -468,6 +518,41 @@ void frame_equalizer_impl::reset_frame_capture()
     d_pending_meta = pmt::make_dict();
     d_last_correlation_score = 0.0;
     d_last_zigbee_ltf_start_raw = ZIGBEE_DEFAULT_LTF_START_RAW;
+    d_ltf_clean_ok = true; // default-accept until the LTF veto runs at symbol 1
+}
+
+// Layer 2 clean-band LTF veto. The two captured LTF symbols (d_captured_symbols
+// bins 0..63 and 64..127, already CFO/phase corrected) are, for a genuine frame,
+// the same training sequence through the same channel, so they agree. ZigBee /
+// noise false detections do not. We measure the normalized agreement on the
+// ZigBee-free outer subcarriers only:
+//   M = |sum conj(X0[k]) X1[k]| / sqrt(sum|X0[k]|^2 * sum|X1[k]|^2),  k in clean band
+// M is in [0,1], ~1 for a real frame (channel/timing/CFO cancel, since both
+// symbols share them) and ~1/sqrt(N)~0.15 for an uncorrelated false detection.
+bool frame_equalizer_impl::ltf_clean_band_ok()
+{
+    gr_complex num(0, 0);
+    double e0 = 0.0;
+    double e1 = 0.0;
+    for (int k = 6; k <= 58; k++) {
+        if (k >= LTF_VETO_BIN_LO && k <= LTF_VETO_BIN_HI) {
+            continue; // skip DC + central ZigBee-occupied bins
+        }
+        const gr_complex a = d_captured_symbols[k];      // LTF symbol 0, bin k
+        const gr_complex b = d_captured_symbols[64 + k]; // LTF symbol 1, bin k
+        num += std::conj(a) * b;
+        e0 += std::norm(a);
+        e1 += std::norm(b);
+    }
+    const double denom = std::sqrt(e0 * e1);
+    const double m = (denom > 1e-12) ? std::abs(num) / denom : 0.0;
+    d_diag_m = (float)m;
+    d_diag_file << "FRAME M=" << m
+                << (m >= LTF_VETO_THRESH ? " ACCEPT" : " REJECT") << "\n";
+    d_diag_file.flush();
+    dout << "LTF clean-band agreement M=" << m
+         << (m >= LTF_VETO_THRESH ? "  ACCEPT" : "  REJECT") << std::endl;
+    return m >= LTF_VETO_THRESH;
 }
 
 bool frame_equalizer_impl::run_equalizer_attempt(gr_complex* frame_symbols,
@@ -727,14 +812,28 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
                                                    std::vector<gr_complex>& final_symbols,
                                                    bool& salvaged)
 {
+
+
+    d_correction_attempt_count++;
     uint8_t attempt_bits[48 * MAX_SYM];
     salvaged = false;
-    dout << "222222222222222222222222222222222 /n";
+    // dout << "222222222222222222222222222222222 /n";
+
+    // Snapshot the raw (pre-equalizer) frame before any decode tier runs, so the
+    // capture at each return reflects exactly what the tiers received -- robust even
+    // if an equalizer were to touch its input buffer.
+    const int capture_total_symbols = std::min(d_frame.n_sym + 3, MAX_SYM + 3);
+    std::memcpy(d_raw_snapshot,
+                d_captured_symbols,
+                capture_total_symbols * 64 * sizeof(gr_complex));
 
     run_equalizer_attempt(d_captured_symbols, attempt_bits, final_symbols);
     if (decode_payload(attempt_bits, false)) {
         std::memcpy(final_bits, attempt_bits, d_frame.n_sym * 48);
-        dout << "111111111111111111111111111111111 /n";
+        d_diag_file << "PAYLOAD M=" << d_diag_m << " CLEAN\n";
+        d_diag_file.flush();
+        capture_raw_frame(d_good_frames_file, d_good_capture_count, d_raw_snapshot,
+                          capture_total_symbols, "GOOD", "CLEAN", 0.0);
         message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
         return true;
     }
@@ -743,7 +842,7 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
     gr_complex salvaged_frame[(MAX_SYM + 3) * 64];
     double best_failed_score = -1.0;
     int best_failed_ltf_start_raw = ZIGBEE_DEFAULT_LTF_START_RAW;
-    d_correction_attempt_count++;
+    
     write_correction_stats();
 
     struct ZigbeeCandidate {
@@ -801,6 +900,55 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
             salvaged = true;
             d_correction_crc_success_count++;
             write_correction_stats();
+            d_diag_file << "PAYLOAD M=" << d_diag_m << " SALVAGE_CANCEL\n";
+            d_diag_file.flush();
+            capture_raw_frame(d_good_frames_file, d_good_capture_count, d_raw_snapshot,
+                              capture_total_symbols, "GOOD", "SALVAGE_CANCEL",
+                              candidate.score);
+            message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
+            return true;
+        }
+    }
+
+    // Erasure fallback: mark the ZigBee-corrupted central subcarriers as unknown
+    // (decoder value 2) and let the convolutional code + interleaver fill them in.
+    // Reference-free; the Viterbi handles erasures natively. Try the clean frame,
+    // then the best ZigBee-cancelled frame (cancellation + erasure combined).
+    run_equalizer_attempt(d_captured_symbols, attempt_bits, final_symbols);
+    if (decode_payload(attempt_bits, false, /*erase_central=*/true)) {
+        std::memcpy(final_bits, attempt_bits, d_frame.n_sym * 48);
+        salvaged = true;
+        d_correction_crc_success_count++;
+        write_correction_stats();
+        dout << "payload erasure decode (clean) OK" << std::endl;
+        d_diag_file << "PAYLOAD M=" << d_diag_m << " ERASURE\n";
+        d_diag_file.flush();
+        capture_raw_frame(d_good_frames_file, d_good_capture_count, d_raw_snapshot,
+                          capture_total_symbols, "GOOD", "ERASURE", 0.0);
+        message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
+        return true;
+    }
+    if (!candidates.empty()) {
+        const ZigbeeCandidate& best = candidates.front();
+        std::memcpy(salvaged_frame,
+                    d_captured_symbols,
+                    d_captured_symbol_count * 64 * sizeof(gr_complex));
+        subtract_zigbee_interference(
+            best.h, best.ltf_start_raw, salvaged_frame, d_frame.n_sym + 3);
+        salvaged_symbols.clear();
+        run_equalizer_attempt(salvaged_frame, attempt_bits, salvaged_symbols);
+        if (decode_payload(attempt_bits, false, /*erase_central=*/true)) {
+            std::memcpy(final_bits, attempt_bits, d_frame.n_sym * 48);
+            final_symbols.swap(salvaged_symbols);
+            salvaged = true;
+            d_correction_crc_success_count++;
+            write_correction_stats();
+            dout << "payload erasure decode (cancelled) OK" << std::endl;
+            d_diag_file << "PAYLOAD M=" << d_diag_m << " ERASURE_CANCEL\n";
+            d_diag_file.flush();
+            capture_raw_frame(d_good_frames_file, d_good_capture_count, d_raw_snapshot,
+                              capture_total_symbols, "GOOD", "ERASURE_CANCEL",
+                              best.score);
             message_port_pub(pmt::mp("tx_feedback"), pmt::intern("ack"));
             return true;
         }
@@ -812,6 +960,11 @@ bool frame_equalizer_impl::try_decode_with_salvage(uint8_t* final_bits,
         write_correction_stats();
     }
 
+    d_diag_file << "PAYLOAD M=" << d_diag_m << " FAIL score=" << best_failed_score
+                << "\n";
+    d_diag_file.flush();
+    capture_raw_frame(d_fail_frames_file, d_fail_capture_count, d_raw_snapshot,
+                      capture_total_symbols, "FAIL", "NONE", best_failed_score);
     message_port_pub(pmt::mp("tx_feedback"), pmt::intern("nack"));
     return false;
 }
@@ -882,6 +1035,42 @@ void frame_equalizer_impl::write_correction_stats()
     stats_file << "last_ltf_start_raw=" << d_last_zigbee_ltf_start_raw << "\n";
 }
 
+// Dump one raw (pre-equalizer) frame to a capture file for offline analysis. The
+// samples are the FFT'd, SFO/common-phase-corrected symbols from d_captured_symbols
+// BEFORE any channel equalization or ZigBee cancellation -- the same input the decode
+// tiers see -- so a good frame and a failed frame can be compared on equal footing.
+// Format per frame:
+//   FRAME idx=.. outcome=GOOD|FAIL tier=.. M=.. bytes=.. enc=.. nsym=.. total_sym=.. score=..
+//   S <sym> re0 im0 re1 im1 ... re63 im63      (one line per OFDM symbol, 64 bins)
+//   END
+void frame_equalizer_impl::capture_raw_frame(std::ofstream& file,
+                                             int& counter,
+                                             const gr_complex* raw,
+                                             int total_symbols,
+                                             const char* outcome,
+                                             const char* tier,
+                                             double score)
+{
+    if (!file.is_open() || counter >= CAPTURE_MAX_PER_BUCKET) {
+        return;
+    }
+    counter++;
+    file << "FRAME idx=" << counter << " outcome=" << outcome << " tier=" << tier
+         << " M=" << d_diag_m << " bytes=" << d_frame_bytes
+         << " enc=" << d_frame_encoding << " nsym=" << d_frame.n_sym
+         << " total_sym=" << total_symbols << " score=" << score << "\n";
+    for (int sym = 0; sym < total_symbols; sym++) {
+        file << "S " << sym;
+        for (int k = 0; k < 64; k++) {
+            const gr_complex v = raw[sym * 64 + k];
+            file << " " << v.real() << " " << v.imag();
+        }
+        file << "\n";
+    }
+    file << "END\n";
+    file.flush();
+}
+
 bool frame_equalizer_impl::decode_signal_field(uint8_t* rx_bits)
 {
 
@@ -892,6 +1081,49 @@ bool frame_equalizer_impl::decode_signal_field(uint8_t* rx_bits)
     uint8_t* decoded_bits = d_decoder.decode(&ofdm, &frame, d_deinterleaved);
 
     return parse_signal(decoded_bits);
+}
+
+// Build the list of data-carrier indices (in the equalizer's carrier order) whose
+// FFT bin falls inside the ZigBee band [LTF_VETO_BIN_LO..HI]. These are the carriers
+// we erase. The skip pattern matches ls.cc/equalize() exactly so the index 'c' here
+// lines up with the bits[] / out_bits[] the equalizer produces.
+void frame_equalizer_impl::compute_erasure_carriers()
+{
+    d_erasure_carriers.clear();
+    int c = 0;
+    for (int i = 0; i < 64; i++) {
+        if ((i == 11) || (i == 25) || (i == 32) || (i == 39) || (i == 53) ||
+            (i < 6) || (i > 58)) {
+            continue; // pilot / DC / guard -> not a data carrier
+        }
+        if (i >= LTF_VETO_BIN_LO && i <= LTF_VETO_BIN_HI) {
+            d_erasure_carriers.push_back(c);
+        }
+        c++;
+    }
+}
+
+// Erasure decode of the SIGNAL field: instead of trusting the ZigBee-corrupted
+// central subcarriers, mark them as ERASURES (decoder value 2 = unknown) and let
+// the convolutional code + interleaver fill them in. One ML decode, no soft path
+// needed (the Viterbi handles value-2 natively, as used for depuncturing).
+bool frame_equalizer_impl::decode_signal_field_erased(const uint8_t* rx_bits)
+{
+    static ofdm_param ofdm(BPSK_1_2);
+    static frame_param frame(ofdm, 0);
+
+    uint8_t erased[48];
+    std::memcpy(erased, rx_bits, 48);
+    for (int c : d_erasure_carriers) {
+        erased[c] = 2; // erase ZigBee-corrupted central subcarrier
+    }
+
+    deinterleave(erased); // permutes; value 2 is preserved
+    uint8_t* decoded_bits = d_decoder.decode(&ofdm, &frame, d_deinterleaved);
+    const bool ok = parse_signal(decoded_bits);
+    dout << "SIGNAL erasure decode (" << d_erasure_carriers.size()
+         << " carriers): " << (ok ? "OK" : "fail") << std::endl;
+    return ok;
 }
 
 void frame_equalizer_impl::deinterleave(uint8_t* rx_bits)
@@ -923,8 +1155,8 @@ bool frame_equalizer_impl::parse_signal(uint8_t* decoded_bits)
         dout << "SIGNAL: wrong parity" << std::endl;
         return false;
     }
-    r = 11; //only for experiments
-    d_frame_bytes = 22; //only for experiments
+    // r = 11; //only for experiments
+    // d_frame_bytes = 22; //only for experiments
 
     switch (r) {
     case 11:
@@ -1001,7 +1233,7 @@ bool frame_equalizer_impl::parse_signal(uint8_t* decoded_bits)
     return true;
 }
 
-void frame_equalizer_impl::deinterleave()
+void frame_equalizer_impl::deinterleave(bool erase_central)
 {
     int n_cbps = d_ofdm.n_cbps;
     int first[MAX_BITS_PER_SYM];
@@ -1019,6 +1251,21 @@ void frame_equalizer_impl::deinterleave()
     for (int i = 0; i < d_frame.n_sym * 48; i++) {
         for (int k = 0; k < d_ofdm.n_bpsc; k++) {
             d_rx_bits[i * d_ofdm.n_bpsc + k] = !!(d_rx_symbols[i] & (1 << k));
+        }
+    }
+
+    // Erasure: replace the ZigBee-corrupted central carriers' coded bits with the
+    // decoder's erasure marker (value 2) so the Viterbi treats them as unknown.
+    // Done after the 0/1 unpacking above (which would otherwise force them to 0/1)
+    // and before the interleave permutation below (which preserves the value).
+    if (erase_central) {
+        for (int sym = 0; sym < d_frame.n_sym; sym++) {
+            for (int c : d_erasure_carriers) {
+                const int carrier = sym * 48 + c;
+                for (int k = 0; k < d_ofdm.n_bpsc; k++) {
+                    d_rx_bits[carrier * d_ofdm.n_bpsc + k] = 2;
+                }
+            }
         }
     }
 
@@ -1053,10 +1300,12 @@ void frame_equalizer_impl::descramble(uint8_t* decoded_bits)
     }
 }
 
-bool frame_equalizer_impl::decode_payload(const uint8_t* rx_symbols, bool publish_feedback)
+bool frame_equalizer_impl::decode_payload(const uint8_t* rx_symbols,
+                                          bool publish_feedback,
+                                          bool erase_central)
 {
     std::memcpy(d_rx_symbols, rx_symbols, d_frame.n_sym * 48);
-    deinterleave();
+    deinterleave(erase_central);
     uint8_t* decoded = d_decoder.decode(&d_ofdm, &d_frame, d_deinterleaved_bits);
     descramble(decoded);
 
