@@ -230,16 +230,22 @@ def main():
         print(f"  drop GOOD->FAIL outer SNR             : "
               f"{to_db(gsnr[OUTER_BINS].mean()) - b_outer_snr:.1f} dB")
 
-    # Per-symbol profile of the FAIL frames: is ZigBee constant or a burst, and does the
-    # outer band hold up across the payload? Symbols 0,1=LTF  2=SIGNAL  3+=payload.
-    if fail:
-        cen = per_symbol_power(fail, ZB_BINS)
-        out = per_symbol_power(fail, OUTER_BINS)
-        print("PER-SYMBOL (FAIL): central(ZigBee) / outer(WiFi) power, SIR per symbol")
-        for i in range(len(cen)):
+    # Per-symbol profile: does the WiFi (outer) power hold up across the payload, or
+    # fade toward the end? Compare GOOD (passed) vs FAIL (failed) -- in a single run this
+    # isolates what distinguishes a decodable frame from a failed one.
+    # Symbols 0,1=LTF  2=SIGNAL  3+=payload.
+    def print_per_symbol(frames, label):
+        if not frames:
+            return
+        out = per_symbol_power(frames, OUTER_BINS)
+        ref = out[:2].mean()  # LTF power, for a normalized (fade) view
+        print(f"PER-SYMBOL ({label}): outer(WiFi) power, and dB relative to LTF")
+        for i in range(len(out)):
             role = "LTF" if i < 2 else ("SIG" if i == 2 else f"pay{i-3}")
-            sir = 10 * np.log10(out[i] / cen[i]) if cen[i] > 0 else float("inf")
-            print(f"    sym {i:2d} {role:5s} cen={cen[i]:.4g}  out={out[i]:.4g}  SIR={sir:+.1f} dB")
+            rel = 10 * np.log10(out[i] / ref) if ref > 0 else 0.0
+            print(f"    sym {i:2d} {role:5s} out={out[i]:.4g}   {rel:+.1f} dB vs LTF")
+    print_per_symbol(good, "GOOD")
+    print_per_symbol(fail, "FAIL")
 
     if g is not None and b is not None:
         # Absolute-power comparison (note: confounded if good/fail are different runs).
