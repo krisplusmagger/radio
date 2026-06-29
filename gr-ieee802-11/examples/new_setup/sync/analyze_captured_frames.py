@@ -65,6 +65,46 @@ def power_spectrum(frame):
     return np.mean(np.abs(frame["sym"]) ** 2, axis=0)
 
 
+def per_bin_snr(frames):
+    """Per-bin SNR (linear) from the two LTF copies, averaged over frames.
+
+    The two captured LTF symbols (rows S 0, S 1) are the SAME training sequence through
+    the SAME channel, so signal = (X0+X1)/2 and noise = (X0-X1)/2. Hence
+        SNR[k] = |X0[k]+X1[k]|^2 / |X0[k]-X1[k]|^2   (split-symbol estimate).
+    This IS per-bin meaningful (unlike a normalized correlation of two scalars, which is
+    trivially 1) and localizes WHERE the band loses SNR -- broadband dip = desensitization
+    (AGC/clipping); a dip only near the center = ZigBee leakage spilling outward.
+    """
+    sig = np.zeros(64)
+    noi = np.zeros(64)
+    cnt = 0
+    for fr in frames:
+        s = fr["sym"]
+        if s.shape[0] < 2:
+            continue
+        x0, x1 = s[0], s[1]
+        sig += np.abs(x0 + x1) ** 2
+        noi += np.abs(x0 - x1) ** 2
+        cnt += 1
+    if not cnt:
+        return np.zeros(64)
+    return (sig / cnt) / np.maximum(noi / cnt, 1e-12)
+
+
+def aggregate_M(frames):
+    """Recompute the C++ outer-bin M from captures, to cross-check the header value."""
+    vals = []
+    for fr in frames:
+        s = fr["sym"]
+        if s.shape[0] < 2:
+            continue
+        x0, x1 = s[0][OUTER_BINS], s[1][OUTER_BINS]
+        num = np.abs(np.sum(np.conj(x0) * x1))
+        den = np.sqrt(np.sum(np.abs(x0) ** 2) * np.sum(np.abs(x1) ** 2))
+        vals.append(num / den if den > 1e-12 else 0.0)
+    return float(np.mean(vals)) if vals else float("nan")
+
+
 def summarize(frames, label):
     if not frames:
         print(f"[{label}] no frames")
@@ -110,19 +150,40 @@ def main():
     b = summarize(fail, "FAIL (salvage/erasure, no CRC)")
     print("=" * 64)
 
+    # Per-bin split-symbol SNR: the decisive within-frame diagnostic (a true per-bin
+    # SNR, immune to the off-vs-on absolute-gain confound).
+    gsnr = per_bin_snr(good) if good else None
+    bsnr = per_bin_snr(fail) if fail else None
+    to_db = lambda lin: 10 * np.log10(np.maximum(lin, 1e-12))
+    if gsnr is not None and bsnr is not None:
+        g_outer_snr = to_db(gsnr[OUTER_BINS].mean())
+        b_outer_snr = to_db(bsnr[OUTER_BINS].mean())
+        print("OUTER-BIN SNR (ZigBee-free carriers, split-symbol estimate):")
+        print(f"  good : {g_outer_snr:.1f} dB      fail : {b_outer_snr:.1f} dB"
+              f"      (drop {g_outer_snr - b_outer_snr:.1f} dB)")
+        print(f"  cross-check aggregate M  good/fail   : "
+              f"{aggregate_M(good):.3f} / {aggregate_M(fail):.3f}  (header said 0.999 / 0.737)")
+        # Is the FAIL SNR dip broadband or only near the center?
+        near = [k for k in OUTER_BINS if abs(k - DC) <= 8]   # carriers just outside ZigBee
+        far = [k for k in OUTER_BINS if abs(k - DC) >= 16]   # band edges
+        print(f"  FAIL SNR near-center vs far-edge      : "
+              f"{to_db(bsnr[near].mean()):.1f} dB / {to_db(bsnr[far].mean()):.1f} dB")
+        if b_outer_snr < g_outer_snr - 6:
+            if to_db(bsnr[near].mean()) - to_db(bsnr[far].mean()) > 4:
+                print("  -> dip concentrated NEAR the center => ZigBee leakage spilling"
+                      " outward. Widening the erase band may recover some frames.")
+            else:
+                print("  -> dip is BROADBAND (edges hurt too) => ZigBee desensitizes the"
+                      " whole chain (AGC/clipping). Erasing wider will NOT help;")
+                print("     lower rx_gain / lower ZigBee TX power to restore outer-bin SNR.")
+
     if g is not None and b is not None:
-        # The two decisive comparisons.
+        # Absolute-power comparison (note: confounded if good/fail are different runs).
         g_outer = g[OUTER_BINS].mean()
         b_outer = b[OUTER_BINS].mean()
-        print("VERDICT:")
-        print(f"  outer-band WiFi power  good vs fail : {g_outer:.4g} vs {b_outer:.4g}"
+        print("OUTER-BAND POWER (confounded if good=ZigBee-off, fail=ZigBee-on):")
+        print(f"  good vs fail : {g_outer:.4g} vs {b_outer:.4g}"
               f"  ({10*np.log10(g_outer/b_outer):+.1f} dB)")
-        if b_outer < 0.5 * g_outer:
-            print("  -> failed frames are WEAKER on the clean outer carriers:"
-                  " an SNR problem, erasing wider will NOT help.")
-        else:
-            print("  -> failed frames have comparable outer-band power:"
-                  " suspect WIDER ZigBee -- try widening the erase band.")
 
     # Optional plot of the two average spectra (DC-centered bin index).
     try:
@@ -130,17 +191,26 @@ def main():
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         x = np.arange(64) - DC
-        plt.figure(figsize=(9, 4))
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 7), sharex=True)
         if g is not None:
-            plt.semilogy(x, g, label=f"GOOD (n={len(good)})")
+            ax1.semilogy(x, g, label=f"GOOD (n={len(good)})")
         if b is not None:
-            plt.semilogy(x, b, label=f"FAIL (n={len(fail)})")
-        plt.axvspan(ZB_LO - DC, ZB_HI - DC, color="red", alpha=0.12, label="ZigBee band")
-        plt.xlabel("subcarrier (relative to DC)")
-        plt.ylabel("mean |X[k]|^2")
-        plt.title("Raw pre-equalizer power spectrum: good vs CRC-fail frames")
-        plt.legend()
-        plt.grid(True, which="both", alpha=0.3)
+            ax1.semilogy(x, b, label=f"FAIL (n={len(fail)})")
+        ax1.axvspan(ZB_LO - DC, ZB_HI - DC, color="red", alpha=0.12, label="ZigBee band")
+        ax1.set_ylabel("mean |X[k]|^2")
+        ax1.set_title("Raw pre-equalizer power spectrum: good vs CRC-fail frames")
+        ax1.legend(); ax1.grid(True, which="both", alpha=0.3)
+
+        occ = np.array(OCC)
+        if gsnr is not None:
+            ax2.plot(occ - DC, to_db(gsnr[occ]), label="GOOD SNR")
+        if bsnr is not None:
+            ax2.plot(occ - DC, to_db(bsnr[occ]), label="FAIL SNR")
+        ax2.axvspan(ZB_LO - DC, ZB_HI - DC, color="red", alpha=0.12)
+        ax2.set_xlabel("subcarrier (relative to DC)")
+        ax2.set_ylabel("per-bin SNR (dB)")
+        ax2.set_title("Per-bin split-symbol SNR: shows WHERE the outer band is hurt")
+        ax2.legend(); ax2.grid(True, alpha=0.3)
         plt.tight_layout()
         plt.savefig("captured_frames_spectrum.png", dpi=130)
         print("\nsaved captured_frames_spectrum.png")
