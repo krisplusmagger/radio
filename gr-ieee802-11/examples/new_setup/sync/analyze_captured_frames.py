@@ -40,8 +40,14 @@ OUTER_BINS = [k for k in OCC if not (ZB_LO <= k <= ZB_HI) and k not in PILOTS an
 # detections whose SIGNAL field decoded to garbage (other bytes/nsym); filter the FAIL
 # bucket to these expected values so the analysis reflects REAL WiFi that failed, not
 # noise that slipped past the veto. Set EXPECTED_BYTES/NSYM to None to disable.
+#
+# NOTE: with known-SIGNAL fallback enabled in the block, bytes/nsym are FORCED to the
+# known values even on noise frames (sigsrc=KNOWN_FALLBACK in the header), so bytes==22
+# alone no longer proves "real WiFi". Also require M >= REAL_M_MIN: real frames keep a
+# high outer-bin LTF agreement (~0.98) while noise sits near the veto floor.
 EXPECTED_BYTES = 22
 EXPECTED_NSYM = 9
+REAL_M_MIN = 0.8
 
 
 def load_frames(path):
@@ -153,18 +159,25 @@ def main():
     fail = load_frames(fail_path)
 
     # Keep only genuine WiFi frames in the FAIL bucket (drop garbage-SIGNAL false
-    # detections). Header fields are strings; compare as ints.
+    # detections). Header fields are strings; compare as ints/floats.
     def _int(fr, key):
         try:
             return int(fr.get(key))
         except (ValueError, TypeError):
             return None
 
+    def _float(fr, key):
+        try:
+            return float(fr.get(key))
+        except (ValueError, TypeError):
+            return None
+
     if EXPECTED_BYTES is not None and EXPECTED_NSYM is not None:
         fail_all = fail
         fail = [fr for fr in fail
-                if _int(fr, "bytes") == EXPECTED_BYTES and _int(fr, "nsym") == EXPECTED_NSYM]
-        print(f"FAIL filter  bytes=={EXPECTED_BYTES} & nsym=={EXPECTED_NSYM}: "
+                if _int(fr, "bytes") == EXPECTED_BYTES and _int(fr, "nsym") == EXPECTED_NSYM
+                and (_float(fr, "M") is None or _float(fr, "M") >= REAL_M_MIN)]
+        print(f"FAIL filter  bytes=={EXPECTED_BYTES} & nsym=={EXPECTED_NSYM} & M>={REAL_M_MIN}: "
               f"kept {len(fail)} of {len(fail_all)} captured fail frames "
               f"(dropped {len(fail_all) - len(fail)} false detections)")
 

@@ -51,6 +51,8 @@ private:
     bool parse_signal(uint8_t* signal);
     bool decode_signal_field(uint8_t* rx_bits);
     bool decode_signal_field_erased(const uint8_t* rx_bits);
+    bool signal_matches_known() const;   // decoded SIGNAL equals the known fixed frame?
+    bool set_known_frame_params();       // force the known frame params (knowledge-aided)
     void deinterleave(uint8_t* rx_bits);
     void deinterleave(bool erase_central = false);
     void descramble(uint8_t* decoded_bits);
@@ -148,6 +150,7 @@ private:
     std::vector<gr_complex> d_pending_payload_symbols;
     bool d_signal_symbols_pending;
     bool d_signal_valid;
+    bool d_signal_was_known_fallback = false; // SIGNAL came from known-frame fallback
     bool d_ltf_clean_ok = true; // Layer 2 clean-band LTF veto result for current frame
     std::vector<int> d_erasure_carriers; // data-carrier indices ZigBee corrupts (erasures)
     int d_captured_symbol_count;

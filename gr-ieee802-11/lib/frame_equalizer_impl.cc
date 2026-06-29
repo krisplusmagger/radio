@@ -56,6 +56,28 @@ constexpr double LTF_VETO_THRESH = 0.25;
 // if you need a bigger sample. Compare the two sets offline to see why processing
 // cannot rescue the hard frames (wider ZigBee? low outer-bin SNR? residual CFO?).
 constexpr int CAPTURE_MAX_PER_BUCKET = 400;
+
+// Erasure band: which central FFT bins to ERASE in the decoder. Kept INDEPENDENT of the
+// Layer-2 veto band (LTF_VETO_BIN_LO/HI) so we can erase a wider ring than we exclude
+// from the veto. Captures show ZigBee leaking just past [28..36] into the adjacent
+// carriers (~bins 26-27, 37-38) at ~13 dB; erasing them (cost 1 each in the 2e+f<d_free
+// budget) beats trusting their wrong bits (cost 2). Widen/narrow per a ZigBee energy
+// scan; do not overshoot (rate-1/2 d_free=10 tolerates ~29% erasure). [26..38] = 32 +/- 6.
+constexpr int ERASE_BIN_LO = 26;
+constexpr int ERASE_BIN_HI = 38;
+
+// Known-frame knowledge. The experimental TX always sends a fixed frame, so the SIGNAL
+// field (rate + length) is known in advance: bytes==22, encoding 0 (BPSK rate-1/2; SIGNAL
+// rate code 11). Two independent uses:
+//   VALIDATE: a decoded SIGNAL that does NOT match the known frame must be wrong -> reject
+//             it (cuts false detections that decode SIGNAL to garbage and reach payload).
+//   FALLBACK: if SIGNAL cannot be decoded (ZigBee-corrupted), assume the known frame and
+//             proceed to payload anyway -- the 32-bit payload CRC stays the real gate, so
+//             a wrong guess cannot ACK. Recovers real frames whose SIGNAL was destroyed.
+constexpr bool KNOWN_SIGNAL_VALIDATE = true;
+constexpr bool KNOWN_SIGNAL_FALLBACK = true;
+constexpr int  KNOWN_FRAME_BYTES = 22;
+constexpr int  KNOWN_FRAME_ENCODING = 0; // 0 = BPSK rate-1/2
 } // namespace
 
 frame_equalizer::sptr
@@ -336,6 +358,31 @@ int frame_equalizer_impl::general_work(int noutput_items,
                 signal_ok = decode_signal_field_erased(signal_bits);
             }
 
+            // Known-frame knowledge. (1) Validate: a SIGNAL that decoded but does not
+            // match the known fixed frame must be wrong -> reject it. (2) Fallback: if
+            // SIGNAL could not be decoded (or was just rejected), assume the known frame
+            // and proceed -- the payload CRC stays the real gate.
+            bool used_known_fallback = false;
+            if (signal_ok && KNOWN_SIGNAL_VALIDATE && !signal_matches_known()) {
+                dout << "SIGNAL mismatch vs known frame (bytes=" << d_frame_bytes
+                     << " enc=" << d_frame_encoding << ") -> reject" << std::endl;
+                signal_ok = false;
+            }
+            if (!signal_ok && KNOWN_SIGNAL_FALLBACK) {
+                signal_ok = set_known_frame_params();
+                used_known_fallback = signal_ok;
+                if (signal_ok) {
+                    dout << "SIGNAL knowledge-aided fallback to known frame" << std::endl;
+                }
+            }
+            d_signal_was_known_fallback = used_known_fallback;
+            d_diag_file << "SIGNAL "
+                        << (signal_ok ? (used_known_fallback ? "KNOWN_FALLBACK" : "DECODED")
+                                      : "FAIL")
+                        << " bytes=" << d_frame_bytes << " enc=" << d_frame_encoding
+                        << "\n";
+            d_diag_file.flush();
+
             if (signal_ok) {
                 d_signal_valid = true;
                 dout << "dsignal_ok; True  /n";
@@ -519,6 +566,7 @@ void frame_equalizer_impl::reset_frame_capture()
     d_last_correlation_score = 0.0;
     d_last_zigbee_ltf_start_raw = ZIGBEE_DEFAULT_LTF_START_RAW;
     d_ltf_clean_ok = true; // default-accept until the LTF veto runs at symbol 1
+    d_signal_was_known_fallback = false;
 }
 
 // Layer 2 clean-band LTF veto. The two captured LTF symbols (d_captured_symbols
@@ -1058,7 +1106,9 @@ void frame_equalizer_impl::capture_raw_frame(std::ofstream& file,
     file << "FRAME idx=" << counter << " outcome=" << outcome << " tier=" << tier
          << " M=" << d_diag_m << " bytes=" << d_frame_bytes
          << " enc=" << d_frame_encoding << " nsym=" << d_frame.n_sym
-         << " total_sym=" << total_symbols << " score=" << score << "\n";
+         << " total_sym=" << total_symbols << " score=" << score
+         << " sigsrc=" << (d_signal_was_known_fallback ? "KNOWN_FALLBACK" : "DECODED")
+         << "\n";
     for (int sym = 0; sym < total_symbols; sym++) {
         file << "S " << sym;
         for (int k = 0; k < 64; k++) {
@@ -1084,9 +1134,11 @@ bool frame_equalizer_impl::decode_signal_field(uint8_t* rx_bits)
 }
 
 // Build the list of data-carrier indices (in the equalizer's carrier order) whose
-// FFT bin falls inside the ZigBee band [LTF_VETO_BIN_LO..HI]. These are the carriers
-// we erase. The skip pattern matches ls.cc/equalize() exactly so the index 'c' here
-// lines up with the bits[] / out_bits[] the equalizer produces.
+// FFT bin falls inside the erasure band [ERASE_BIN_LO..HI]. These are the carriers we
+// erase. The band is independent of the Layer-2 veto band (see constants), so it can be
+// wider to cover ZigBee leakage spilling past the veto exclusion. The skip pattern
+// matches ls.cc/equalize() exactly so the index 'c' here lines up with the bits[] /
+// out_bits[] the equalizer produces.
 void frame_equalizer_impl::compute_erasure_carriers()
 {
     d_erasure_carriers.clear();
@@ -1096,7 +1148,7 @@ void frame_equalizer_impl::compute_erasure_carriers()
             (i < 6) || (i > 58)) {
             continue; // pilot / DC / guard -> not a data carrier
         }
-        if (i >= LTF_VETO_BIN_LO && i <= LTF_VETO_BIN_HI) {
+        if (i >= ERASE_BIN_LO && i <= ERASE_BIN_HI) {
             d_erasure_carriers.push_back(c);
         }
         c++;
@@ -1230,6 +1282,52 @@ bool frame_equalizer_impl::parse_signal(uint8_t* decoded_bits)
           d_frame_encoding,
           d_frame_bytes,
           d_frame_symbols);
+    return true;
+}
+
+// Does the just-decoded SIGNAL field match the known fixed frame? Called after
+// parse_signal() has populated d_frame_bytes / d_frame_encoding. A mismatch means the
+// SIGNAL decode is wrong (corruption or a false detection).
+bool frame_equalizer_impl::signal_matches_known() const
+{
+    return d_frame_bytes == KNOWN_FRAME_BYTES &&
+           d_frame_encoding == KNOWN_FRAME_ENCODING;
+}
+
+// Knowledge-aided fallback: force the known frame parameters when SIGNAL cannot be
+// decoded, so a ZigBee-corrupted SIGNAL does not drop an otherwise-real frame. Mirrors
+// the tail of parse_signal() for the known encoding; the payload CRC remains the gate.
+bool frame_equalizer_impl::set_known_frame_params()
+{
+    d_frame_bytes = KNOWN_FRAME_BYTES;
+    d_frame_encoding = KNOWN_FRAME_ENCODING;
+
+    ofdm_param ofdm = ofdm_param((Encoding)d_frame_encoding);
+    frame_param frame = frame_param(ofdm, d_frame_bytes);
+    if (frame.n_sym > MAX_SYM || frame.psdu_size > MAX_PSDU_SIZE) {
+        return false;
+    }
+    d_ofdm = ofdm;
+    d_frame = frame;
+    d_frame_symbols = d_frame.n_sym;
+
+    switch (d_frame_encoding) {
+    case 0:
+    case 1:
+        d_frame_mod = d_bpsk;
+        break;
+    case 2:
+    case 3:
+        d_frame_mod = d_qpsk;
+        break;
+    case 4:
+    case 5:
+        d_frame_mod = d_16qam;
+        break;
+    default:
+        d_frame_mod = d_64qam;
+        break;
+    }
     return true;
 }
 
