@@ -217,6 +217,17 @@ Other Session-5 numbers: GOOD outer SNR 31.8 dB (M 0.999); FAIL outer SNR 21.0 d
 
 ## 7. Root cause (current best conclusion)
 
+> **CORRECTION (later finding).** The device attribution below is **wrong**: the
+> underflowing sink is the **ZigBee TX** (192.168.10.2), **not** the WiFi TX — disabling
+> the ZigBee path removes every underflow, and the WiFi TX has ~30× the per-burst slack and
+> does not starve. The underflow is also **rate-independent** (persists at `pkt_rate=3`),
+> so the "burst-rate margin" reasoning here is also wrong. See
+> **`zigbee_tx_underflow_investigation.md`** for the corrected analysis. **The causal link
+> between the ZigBee-TX underflow and the WiFi decode failures (§6.6) is UNCONFIRMED** —
+> re-run `analyze_captured_frames.py` with ZigBee fully disabled to test whether the WiFi
+> failures actually disappear. The §6 *observations* (per-symbol tail fade, etc.) stand;
+> only the §7 underflow *cause/device* is corrected.
+
 **TX underflows are truncating the tail of the WiFi burst.** The run log shows the WiFi
 `usrp_sink` chronically starving:
 
