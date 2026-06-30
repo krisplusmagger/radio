@@ -49,6 +49,13 @@ EXPECTED_BYTES = 22
 EXPECTED_NSYM = 9
 REAL_M_MIN = 0.8
 
+# Restrict the GOOD bucket to frames that passed CRC via a specific decode tier (the
+# `tier=` header field): CLEAN / SALVAGE_CANCEL / ERASURE / ERASURE_CANCEL. Set to
+# "SALVAGE_CANCEL" to compare frames the ZigBee-cancellation rescued against the frames
+# nothing could rescue (FAIL) -- this isolates what makes a frame cancellable vs not.
+# Set to None to use all good frames.
+GOOD_TIER = "SALVAGE_CANCEL"
+
 
 def load_frames(path):
     """Yield dicts: {meta fields..., 'sym': complex ndarray (total_sym, 64)}."""
@@ -193,10 +200,18 @@ def main():
               f"kept {len(fail)} of {len(fail_all)} captured fail frames "
               f"(dropped {len(fail_all) - len(fail)} false detections)")
 
+    # Restrict the GOOD bucket to one decode tier (e.g. SALVAGE_CANCEL) if requested.
+    good_label = "GOOD (passed CRC)"
+    if GOOD_TIER is not None:
+        good_all = good
+        good = [fr for fr in good if fr.get("tier") == GOOD_TIER]
+        good_label = f"GOOD tier={GOOD_TIER} (rescued)"
+        print(f"GOOD filter  tier=={GOOD_TIER}: kept {len(good)} of {len(good_all)} good frames")
+
     print("=" * 64)
-    g = summarize(good, "GOOD (passed CRC)")
+    g = summarize(good, good_label)
     print("-" * 64)
-    b = summarize(fail, "FAIL (salvage/erasure, no CRC)")
+    b = summarize(fail, "FAIL (no tier passed CRC)")
     print("=" * 64)
 
     # Per-bin split-symbol SNR: the decisive within-frame diagnostic (a true per-bin
@@ -244,7 +259,8 @@ def main():
             role = "LTF" if i < 2 else ("SIG" if i == 2 else f"pay{i-3}")
             rel = 10 * np.log10(out[i] / ref) if ref > 0 else 0.0
             print(f"    sym {i:2d} {role:5s} out={out[i]:.4g}   {rel:+.1f} dB vs LTF")
-    print_per_symbol(good, "GOOD")
+    good_tag = GOOD_TIER if GOOD_TIER is not None else "GOOD"
+    print_per_symbol(good, good_tag)
     print_per_symbol(fail, "FAIL")
 
     if g is not None and b is not None:
@@ -263,7 +279,7 @@ def main():
         x = np.arange(64) - DC
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 7), sharex=True)
         if g is not None:
-            ax1.semilogy(x, g, label=f"GOOD (n={len(good)})")
+            ax1.semilogy(x, g, label=f"{good_tag} (n={len(good)})")
         if b is not None:
             ax1.semilogy(x, b, label=f"FAIL (n={len(fail)})")
         ax1.axvspan(ZB_LO - DC, ZB_HI - DC, color="red", alpha=0.12, label="ZigBee band")
@@ -273,7 +289,7 @@ def main():
 
         occ = np.array(OCC)
         if gsnr is not None:
-            ax2.plot(occ - DC, to_db(gsnr[occ]), label="GOOD SNR")
+            ax2.plot(occ - DC, to_db(gsnr[occ]), label=f"{good_tag} SNR")
         if bsnr is not None:
             ax2.plot(occ - DC, to_db(bsnr[occ]), label="FAIL SNR")
         ax2.axvspan(ZB_LO - DC, ZB_HI - DC, color="red", alpha=0.12)
