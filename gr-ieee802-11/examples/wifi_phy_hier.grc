@@ -558,9 +558,9 @@ blocks:
     alias: ''
     bw: bandwidth
     comment: ''
-    debug: 'True'
+    debug: 'False'
     freq: frequency
-    log: 'True'
+    log: 'False'
     maxoutbuf: '0'
     minoutbuf: '0'
     signal_filename: '"zigbee_test.txt"'
@@ -750,7 +750,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [800, 960.0]
+    coordinate: [840, 960.0]
     rotation: 0
     state: enabled
 - name: sync_short

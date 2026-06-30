@@ -274,3 +274,21 @@ wifi_start tag ─► reset, load ε₀
 - Only **BPSK rate-1/2** has been exercised on hardware; the erasure injection is
   written generally for `n_bpsc > 1` but higher-order modulation is untested.
 ```
+
+
+
+new tips:
+we could capture the frame that could pass the crc check(good frames), also capture that sucessfully enter in salvege or erasure stage but still cannot pass the crc check, but we need to record the raw one(which means it is not processed by equalizer)
+
+
+later we could compare those frames
+see what's the difference and why after the processing they still cannot pass the crc check
+
+
+
+since for the wifi signal filed, the number of bytes and n_symbos are predefined, we can utilze them as a knowledge to help the algorithm to decode signal filed. if the deoced singal filed data deos not match the known knowledge, which means the decoding for signal filed is wrong. or we could utilze the known knowledge to help us docoding
+
+the next thing is widen the erase band 
+
+now implement both
+

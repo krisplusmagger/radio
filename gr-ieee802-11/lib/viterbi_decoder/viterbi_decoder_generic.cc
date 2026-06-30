@@ -116,7 +116,13 @@ void viterbi_decoder::viterbi_butterfly2_generic(unsigned char* symbols,
     }
 
     for (i = 0; i < 2; i++) {
-        if (symbols[0] == 2) {
+        if (symbols[0] == 2 && symbols[1] == 2) {
+            // both coded bits erased -> neutral step (equal metric on every branch)
+            for (j = 0; j < 16; j++) {
+                metsvm[j] = 1;
+                metsv[j] = 1;
+            }
+        } else if (symbols[0] == 2) {
             for (j = 0; j < 16; j++) {
                 metsvm[j] = d_branchtab27_generic[1].c[(i * 16) + j] ^ sym1v[j];
                 metsv[j] = 1 - metsvm[j];
@@ -202,7 +208,13 @@ void viterbi_decoder::viterbi_butterfly2_generic(unsigned char* symbols,
     }
 
     for (i = 0; i < 2; i++) {
-        if (symbols[2] == 2) {
+        if (symbols[2] == 2 && symbols[3] == 2) {
+            // both coded bits erased -> neutral step (see block above)
+            for (j = 0; j < 16; j++) {
+                metsvm[j] = 1;
+                metsv[j] = 1;
+            }
+        } else if (symbols[2] == 2) {
             for (j = 0; j < 16; j++) {
                 metsvm[j] = d_branchtab27_generic[1].c[(i * 16) + j] ^ sym1v[j];
                 metsv[j] = 1 - metsvm[j];

@@ -1,0 +1,14 @@
+[INFO] [UHD] linux; GNU C++ version 13.2.0; Boost_108300; UHD_4.6.0.HEAD-0-g50fa3baa
+Traceback (most recent call last):
+  File "/home/kk/gnuradio/gr-ieee802-11/examples/new_setup/sync/cfo_error_estimation/./wifi_zigbee_sync_tx.py", line 534, in <module>
+    main()
+  File "/home/kk/gnuradio/gr-ieee802-11/examples/new_setup/sync/cfo_error_estimation/./wifi_zigbee_sync_tx.py", line 511, in main
+    tb = top_block_cls()
+         ^^^^^^^^^^^^^^^
+  File "/home/kk/gnuradio/gr-ieee802-11/examples/new_setup/sync/cfo_error_estimation/./wifi_zigbee_sync_tx.py", line 224, in __init__
+    self.frequency = uhd.usrp_source(
+                     ^^^^^^^^^^^^^^^^
+RuntimeError: LookupError: KeyError: No devices found for ----->
+Device Address:
+    addr: 192.168.10.3
+

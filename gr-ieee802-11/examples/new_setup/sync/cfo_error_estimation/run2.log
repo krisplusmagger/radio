@@ -1,0 +1,19 @@
+[INFO] [UHD] linux; GNU C++ version 13.2.0; Boost_108300; UHD_4.6.0.HEAD-0-g50fa3baa
+[INFO] [X300] X300 initialization sequence...
+[INFO] [X300] Maximum frame size: 1472 bytes.
+[INFO] [GPS] Found an internal GPSDO: LC_XO, Firmware Rev 0.929a
+[INFO] [X300] Radio 1x clock: 200 MHz
+[INFO] [MULTI_USRP]     1) catch time transition at pps edge
+[INFO] [MULTI_USRP]     2) set times next pps (synchronously)
+[INFO] [X300] X300 initialization sequence...
+[INFO] [X300] Maximum frame size: 1472 bytes.
+[INFO] [X300] Radio 1x clock: 200 MHz
+Traceback (most recent call last):
+  File "/home/kk/gnuradio/gr-ieee802-11/examples/new_setup/sync/cfo_error_estimation/../wifi_zigbee_sync_tx.py", line 520, in <module>
+    main()
+  File "/home/kk/gnuradio/gr-ieee802-11/examples/new_setup/sync/cfo_error_estimation/../wifi_zigbee_sync_tx.py", line 497, in main
+    tb = top_block_cls()
+         ^^^^^^^^^^^^^^^
+  File "/home/kk/gnuradio/gr-ieee802-11/examples/new_setup/sync/cfo_error_estimation/../wifi_zigbee_sync_tx.py", line 277, in __init__
+    self.wifi_tx.set_clock_source('external', 0)
+RuntimeError: RuntimeError: Reference Clock PLL failed to lock to external source.

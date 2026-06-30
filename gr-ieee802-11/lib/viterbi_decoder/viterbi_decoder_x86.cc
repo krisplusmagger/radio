@@ -108,7 +108,14 @@ void viterbi_decoder::viterbi_butterfly2_sse2(
     sym1v = _mm_set1_epi8(symbols[1]);
 
     for (i = 0; i < 2; i++) {
-        if (symbols[0] == 2) {
+        if (symbols[0] == 2 && symbols[1] == 2) {
+            // both coded bits erased -> neutral step: equal metric on every branch
+            // so the survivor depends only on the prior path metrics. (Without this
+            // the symbols[0]==2 branch would compute 1-(branchtab^2) -> ~255 and
+            // bias the survivor.)
+            metsvm = _mm_set1_epi8(1);
+            metsv = _mm_set1_epi8(1);
+        } else if (symbols[0] == 2) {
             metsvm = _mm_xor_si128(d_branchtab27_sse2[1].v[i], sym1v);
             metsv = _mm_sub_epi8(_mm_set1_epi8(1), metsvm);
         } else if (symbols[1] == 2) {
@@ -157,7 +164,12 @@ void viterbi_decoder::viterbi_butterfly2_sse2(
     sym1v = _mm_set1_epi8(symbols[3]);
 
     for (i = 0; i < 2; i++) {
-        if (symbols[2] == 2) {
+        if (symbols[2] == 2 && symbols[3] == 2) {
+            // both coded bits erased -> neutral step (see block above).
+            metsvm = _mm_set1_epi8(1);
+            metsv = _mm_set1_epi8(1);
+
+        } else if (symbols[2] == 2) {
             metsvm = _mm_xor_si128(d_branchtab27_sse2[1].v[i], sym1v);
             metsv = _mm_sub_epi8(_mm_set1_epi8(1), metsvm);
 

@@ -75,7 +75,7 @@ constexpr int ERASE_BIN_HI = 38;
 //             proceed to payload anyway -- the 32-bit payload CRC stays the real gate, so
 //             a wrong guess cannot ACK. Recovers real frames whose SIGNAL was destroyed.
 constexpr bool KNOWN_SIGNAL_VALIDATE = true;
-constexpr bool KNOWN_SIGNAL_FALLBACK = true;
+constexpr bool KNOWN_SIGNAL_FALLBACK = false;
 constexpr int  KNOWN_FRAME_BYTES = 22;
 constexpr int  KNOWN_FRAME_ENCODING = 0; // 0 = BPSK rate-1/2
 } // namespace

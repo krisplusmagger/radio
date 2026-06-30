@@ -85,22 +85,22 @@ namespace gr {
                   << "\n";
 
             }
-            if (key == "wifi_start_raw_long") {
-                start_index_file
-                  << "offset=" << t.offset
-                  << " key=" << key
-                  << " value=" << pmt::write_string(t.value)
-                  << "\n";
+            // if (key == "wifi_start_raw_long") {
+            //     start_index_file
+            //       << "offset=" << t.offset
+            //       << " key=" << key
+            //       << " value=" << pmt::write_string(t.value)
+            //       << "\n";
 
-            }
-            if (key == "packet_len") {
-                start_index_file
-                  << "offset=" << t.offset
-                  << " key=" << key
-                  << " value=" << pmt::write_string(t.value)
-                  << "\n";
+            // }
+            // if (key == "packet_len") {
+            //     start_index_file
+            //       << "offset=" << t.offset
+            //       << " key=" << key
+            //       << " value=" << pmt::write_string(t.value)
+            //       << "\n";
 
-            }
+            // }
 
 
         }
